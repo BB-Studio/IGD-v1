@@ -155,40 +155,49 @@ def add_tournament():
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     if form.validate_on_submit():
-        # Create upload directories if they don't exist
-        uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
-        tournaments_path = os.path.join(uploads_path, 'tournaments')
-        os.makedirs(tournaments_path, exist_ok=True)
+        try:
+            # Create upload directories if they don't exist
+            uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
+            tournaments_path = os.path.join(uploads_path, 'tournaments')
+            os.makedirs(tournaments_path, exist_ok=True)
 
-        tournament = Tournament(
-            name=form.name.data,
-            start_date=form.start_date.data,
-            end_date=form.end_date.data,
-            state=form.state.data,
-            info=form.info.data,
-            status='upcoming',
-            pairing_system=form.pairing_system.data
-        )
-
-        if form.cover_photo.data and form.cover_photo.data.filename:
-            tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
-
-        db.session.add(tournament)
-        db.session.commit()
-
-        # Add selected players to the tournament
-        for player_id in form.players.data:
-            player = Player.query.get(player_id)
-            tournament_player = TournamentPlayer(
-                tournament=tournament,
-                player=player,
-                initial_rating=player.rating
+            tournament = Tournament(
+                name=form.name.data,
+                start_date=form.start_date.data,
+                end_date=form.end_date.data,
+                state=form.state.data,
+                info=form.info.data,
+                status='upcoming',
+                pairing_system=form.pairing_system.data
             )
-            db.session.add(tournament_player)
 
-        db.session.commit()
-        flash('Tournament created successfully!')
-        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+            if form.cover_photo.data and form.cover_photo.data.filename:
+                tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
+
+            db.session.add(tournament)
+            db.session.commit()
+
+            # Add selected players to the tournament
+            for player_id in form.players.data:
+                player = Player.query.get(player_id)
+                tournament_player = TournamentPlayer(
+                    tournament=tournament,
+                    player=player,
+                    initial_rating=player.rating
+                )
+                db.session.add(tournament_player)
+
+            db.session.commit()
+            flash('Tournament created successfully!')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error creating tournament: {str(e)}', 'error')
+    elif form.errors:
+        # Flash form validation errors
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"Error in {field}: {error}", 'error')
 
     return render_template('add_tournament.html', form=form)
 
@@ -208,7 +217,7 @@ def edit_tournament(tournament_id):
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     # Set current players when displaying the form
-    if not form.is_submitted():
+    if request.method == 'GET':
         form.players.data = [tp.player_id for tp in tournament.players]
 
     if form.validate_on_submit():
@@ -257,6 +266,11 @@ def edit_tournament(tournament_id):
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating tournament: {str(e)}', 'error')
+    elif form.errors:
+        # Flash form validation errors
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"Error in {field}: {error}", 'error')
 
     return render_template('add_tournament.html', form=form, tournament=tournament)
 

@@ -75,14 +75,7 @@
                             {% endfor %}
                         </div>
 
-                        <div class="mb-3">
-                            {{ form.rounds.label(class="form-label") }}
-                            {{ form.rounds(class="form-control", type="number", min=1) }}
-                            {% for error in form.rounds.errors %}
-                            <span class="text-danger">{{ error }}</span>
-                            {% endfor %}
-                            <small class="text-muted">Number of planned rounds for this tournament</small>
-                        </div>
+                        
 
                         <div class="mb-3">
                             {{ form.players.label(class="form-label") }}
