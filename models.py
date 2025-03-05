@@ -97,6 +97,11 @@ class Tournament(db.Model):
     pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon, round_robin
     players = db.relationship('TournamentPlayer', backref='tournament', lazy=True, cascade="all, delete-orphan")
     rounds = db.relationship('Round', backref='tournament', lazy=True, cascade="all, delete-orphan")
+    
+    # This ensures compatibility with existing database
+    @property
+    def rounds_count(self):
+        return len(self.rounds)
 
 class Round(db.Model):
     id = db.Column(db.Integer, primary_key=True)
