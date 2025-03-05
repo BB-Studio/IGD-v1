@@ -1,11 +1,12 @@
 from datetime import datetime, timedelta
 import os
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
+import random
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import markdown2
 from app import db
-from models import Player, Tournament, Match, TournamentPlayer
+from models import Player, Tournament, Match, TournamentPlayer, Round, RoundPairing # Added Round and RoundPairing imports
 from forms import PlayerForm, TournamentForm, MatchForm
 from glicko import Glicko2  # Added Glicko2 import
 
@@ -472,3 +473,216 @@ def edit_player(player_id):
         return redirect(url_for('main.players'))
 
     return render_template('add_player.html', form=form, player=player)
+
+
+def swiss_pairing(players):
+    """
+    Implementation of Swiss pairing system
+    """
+    # Sort players by rating
+    sorted_players = sorted(players, key=lambda x: x.rating, reverse=True)
+    pairs = []
+
+    # Simple pairing: match players with closest ratings
+    for i in range(0, len(sorted_players), 2):
+        if i + 1 < len(sorted_players):
+            # Randomly assign colors
+            if random.random() > 0.5:
+                pairs.append((sorted_players[i], sorted_players[i+1]))
+            else:
+                pairs.append((sorted_players[i+1], sorted_players[i]))
+
+    # If odd number of players, last player gets a bye
+    if len(sorted_players) % 2 == 1:
+        pairs.append((sorted_players[-1], None))
+
+    return pairs
+
+def macmahon_pairing(players):
+    """
+    Implementation of MacMahon pairing system
+    """
+    # Group players by score/rating
+    player_groups = {}
+    for player in players:
+        score = player.current_score
+        if score not in player_groups:
+            player_groups[score] = []
+        player_groups[score].append(player)
+
+    pairs = []
+    unpaired = []
+
+    # Pair within same score groups first
+    for score in sorted(player_groups.keys(), reverse=True):
+        group = player_groups[score]
+        group_pairs = swiss_pairing(group)
+        pairs.extend([p for p in group_pairs if p[1] is not None])
+        if any(p[1] is None for p in group_pairs):
+            unpaired.extend([p[0] for p in group_pairs if p[1] is None])
+
+    # Pair remaining players across groups
+    if unpaired:
+        cross_pairs = swiss_pairing(unpaired)
+        pairs.extend(cross_pairs)
+
+    return pairs
+
+@main_bp.route('/tournament/<int:tournament_id>/round', methods=['POST'])
+@login_required
+def create_round(tournament_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+    tournament = Tournament.query.get_or_404(tournament_id)
+
+    # Validate tournament status
+    if tournament.status == 'completed':
+        flash('Cannot create rounds for completed tournaments.')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+    # Update tournament status to ongoing if it's not already
+    if tournament.status == 'upcoming':
+        tournament.status = 'ongoing'
+
+    # Create new round
+    round_number = len(tournament.rounds) + 1
+    new_round = Round(
+        tournament=tournament,
+        number=round_number,
+        datetime=datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M'),
+        status='pending'
+    )
+    db.session.add(new_round)
+
+    # Get players and their current ratings
+    tournament_players = [tp.player for tp in tournament.players]
+
+    # Generate pairings based on tournament system
+    if tournament.pairing_system == 'macmahon':
+        pairs = macmahon_pairing(tournament_players)
+    else:  # default to Swiss
+        pairs = swiss_pairing(tournament_players)
+
+    # Create pairings
+    for white, black in pairs:
+        if black is not None:  # Skip byes
+            pairing = RoundPairing(
+                round=new_round,
+                white_player=white,
+                black_player=black
+            )
+            db.session.add(pairing)
+
+    db.session.commit()
+    flash(f'Round {round_number} created successfully!')
+    return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+@main_bp.route('/tournament/round/<int:round_id>/repair', methods=['POST'])
+@login_required
+def repair_round(round_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    round = Round.query.get_or_404(round_id)
+
+    # Clear existing pairings
+    RoundPairing.query.filter_by(round_id=round_id).delete()
+
+    # Get players and their current ratings
+    tournament_players = [tp.player for tp in round.tournament.players]
+
+    # Generate new pairings
+    if round.tournament.pairing_system == 'macmahon':
+        pairs = macmahon_pairing(tournament_players)
+    else:
+        pairs = swiss_pairing(tournament_players)
+
+    # Create new pairings
+    for white, black in pairs:
+        if black is not None:
+            pairing = RoundPairing(
+                round=round,
+                white_player=white,
+                black_player=black
+            )
+            db.session.add(pairing)
+
+    db.session.commit()
+    return jsonify({'success': True})
+
+@main_bp.route('/tournament/pairing/<int:pairing_id>/result', methods=['POST'])
+@login_required
+def update_pairing_result(pairing_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    pairing = RoundPairing.query.get_or_404(pairing_id)
+    pairing.result = request.form['result']
+    db.session.commit()
+
+    return redirect(url_for('main.tournament_details', tournament_id=pairing.round.tournament_id))
+
+@main_bp.route('/tournament/round/<int:round_id>/complete', methods=['POST'])
+@login_required
+def complete_round(round_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'error': 'Access denied'})
+
+    round = Round.query.get_or_404(round_id)
+
+    # Update player ratings based on results
+    glicko2 = Glicko2()
+
+    for pairing in round.pairings:
+        if pairing.result:
+            # Calculate score (1 for win, 0.5 for draw, 0 for loss)
+            if pairing.result == 'Jigo':
+                white_score = black_score = 0.5
+            elif pairing.result.startswith('W+'):
+                white_score, black_score = 1.0, 0.0
+            else:  # B+
+                white_score, black_score = 0.0, 1.0
+
+            # Update white player rating
+            white_matches = [(pairing.black_player.rating, 
+                            pairing.black_player.rating_deviation, 
+                            white_score)]
+            new_white_rating, new_white_rd, new_white_vol = glicko2.rate(
+                pairing.white_player.rating,
+                pairing.white_player.rating_deviation,
+                pairing.white_player.volatility,
+                white_matches
+            )
+
+            # Update black player rating
+            black_matches = [(pairing.white_player.rating, 
+                            pairing.white_player.rating_deviation, 
+                            black_score)]
+            new_black_rating, new_black_rd, new_black_vol = glicko2.rate(
+                pairing.black_player.rating,
+                pairing.black_player.rating_deviation,
+                pairing.black_player.volatility,
+                black_matches
+            )
+
+            # Save new ratings
+            pairing.white_player.rating = new_white_rating
+            pairing.white_player.rating_deviation = new_white_rd
+            pairing.white_player.volatility = new_white_vol
+
+            pairing.black_player.rating = new_black_rating
+            pairing.black_player.rating_deviation = new_black_rd
+            pairing.black_player.volatility = new_black_vol
+
+    # Mark round as completed
+    round.status = 'completed'
+
+    # Check if this was the last round
+    tournament = round.tournament
+    if all(r.status == 'completed' for r in tournament.rounds):
+        tournament.status = 'completed'
+
+    db.session.commit()
+    return jsonify({'success': True})

@@ -82,8 +82,29 @@ class Tournament(db.Model):
     info = db.Column(db.Text)  # Markdown content
     cover_photo = db.Column(db.String(255))  # Path to cover photo
     status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed
+    pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon
     players = db.relationship('TournamentPlayer', backref='tournament', lazy=True)
-    matches = db.relationship('Match', backref='tournament', lazy=True)
+    rounds = db.relationship('Round', backref='tournament', lazy=True)
+
+class Round(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
+    number = db.Column(db.Integer, nullable=False)
+    datetime = db.Column(db.DateTime, nullable=False)
+    status = db.Column(db.String(20), default='pending')  # pending, ongoing, completed
+    pairings = db.relationship('RoundPairing', backref='round', lazy=True)
+
+    class Meta:
+        unique_together = ('tournament_id', 'number')
+
+class RoundPairing(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    round_id = db.Column(db.Integer, db.ForeignKey('round.id'), nullable=False)
+    white_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    result = db.Column(db.String(10))  # B+R, W+1.5, etc.
+    white_player = db.relationship('Player', foreign_keys=[white_player_id])
+    black_player = db.relationship('Player', foreign_keys=[black_player_id])
 
 class TournamentPlayer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
