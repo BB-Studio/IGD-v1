@@ -86,161 +86,88 @@
     <div class="row">
         <div class="col">
             <div class="card">
-                <div class="card-header">
-                    <h3>Rounds</h3>
-                </div>
                 <div class="card-body">
-                    {% if current_user.is_authenticated and current_user.is_admin and tournament.status != 'completed' %}
-                    <form action="{{ url_for('main.create_round', tournament_id=tournament.id) }}" method="post" class="mb-4">
-                        <div class="input-group mb-3">
-                            <input type="datetime-local" name="datetime" class="form-control" required>
-                            <button type="submit" class="btn btn-primary">Create Round</button>
-                        </div>
-                    </form>
-                    {% endif %}
-
+                    <h5 class="card-title">Rounds</h5>
                     {% if tournament.rounds %}
-                    <div class="accordion" id="roundsAccordion">
+                    <ul class="nav nav-tabs" id="roundTabs" role="tablist">
                         {% for round in tournament.rounds %}
-                        <div class="accordion-item">
-                            <h2 class="accordion-header" id="heading{{ round.id }}">
-                                <button class="accordion-button {% if not loop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ round.id }}" aria-expanded="{% if loop.first %}true{% else %}false{% endif %}" aria-controls="collapse{{ round.id }}">
-                                    Round {{ round.number }} - {{ round.datetime.strftime('%Y-%m-%d %H:%M') }} ({{ round.status|capitalize }})
-                                </button>
-                            </h2>
-                            <div id="collapse{{ round.id }}" class="accordion-collapse collapse {% if loop.first %}show{% endif %}" aria-labelledby="heading{{ round.id }}" data-bs-parent="#roundsAccordion">
-                                <div class="accordion-body">
-                                    {% if current_user.is_authenticated and current_user.is_admin and round.status != 'completed' %}
-                                    <div class="mb-3">
-                                        <button class="btn btn-sm btn-secondary" onclick="repairRound({{ round.id }})">Auto-Repair Pairings</button>
-                                        <a href="{{ url_for('main.manual_pairing', round_id=round.id) }}" class="btn btn-sm btn-info">Manual Pairing</a>
-                                        <button class="btn btn-sm btn-success" onclick="completeRound({{ round.id }})">Complete Round</button>
-                                    </div>
-                                    {% endif %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link {% if loop.first %}active{% endif %}" 
+                                    id="round{{ round.number }}-tab" 
+                                    data-bs-toggle="tab" 
+                                    data-bs-target="#round{{ round.number }}" 
+                                    type="button" 
+                                    role="tab">
+                                Round {{ round.number }}
+                            </button>
+                        </li>
+                        {% endfor %}
+                    </ul>
 
-                                    <div class="table-responsive">
-                                        <table class="table table-striped">
-                                            <thead>
-                                                <tr>
-                                                    <th>Board</th>
-                                                    <th>White</th>
-                                                    <th>Black</th>
-                                                    <th>Result</th>
-                                                    {% if current_user.is_authenticated and current_user.is_admin and round.status != 'completed' %}
-                                                    <th>Actions</th>
-                                                    {% endif %}
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {% for pairing in round.pairings %}
-                                                <tr>
-                                                    <td>{{ loop.index }}</td>
-                                                    <td>
-                                                        {% if pairing.white_player %}
-                                                        <a href="{{ url_for('main.player_stats', player_id=pairing.white_player.id) }}">
-                                                            {{ pairing.white_player.name }} ({{ "%.0f"|format(pairing.white_player.rating) }})
-                                                        </a>
-                                                        {% else %}
-                                                        Bye
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {% if pairing.black_player %}
-                                                        <a href="{{ url_for('main.player_stats', player_id=pairing.black_player.id) }}">
-                                                            {{ pairing.black_player.name }} ({{ "%.0f"|format(pairing.black_player.rating) }})
-                                                        </a>
-                                                        {% else %}
-                                                        Bye
-                                                        {% endif %}
-                                                    </td>
-                                                    <td>
-                                                        {% if pairing.result %}
-                                                        <strong>{{ pairing.result }}</strong>
-                                                        {% else %}
-                                                        Not reported
-                                                        {% endif %}
-                                                    </td>
-                                                    {% if current_user.is_authenticated and current_user.is_admin and round.status != 'completed' %}
-                                                    <td>
-                                                        {% if pairing.black_player %}
-                                                        <button class="btn btn-sm btn-primary" onclick="editResult({{ pairing.id }})">
-                                                            {% if pairing.result %}Update Result{% else %}Enter Result{% endif %}
-                                                        </button>
-                                                        {% endif %}
-                                                    </td>
-                                                    {% endif %}
-                                                </tr>
-                                                {% endfor %}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                    <div class="tab-content mt-3" id="roundTabContent">
+                        {% for round in tournament.rounds %}
+                        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+                             id="round{{ round.number }}" 
+                             role="tabpanel">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h6>Round {{ round.number }} - {{ round.datetime.strftime('%Y-%m-%d %H:%M') }}</h6>
+                                {% if current_user.is_admin and round.status != 'completed' %}
+                                <div class="btn-group">
+                                    <button class="btn btn-outline-primary btn-sm" onclick="repairRound({{ round.id }})">
+                                        Repair Round
+                                    </button>
+                                    <button class="btn btn-success btn-sm" onclick="completeRound({{ round.id }})">
+                                        Complete Round
+                                    </button>
                                 </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>White</th>
+                                            <th>Black</th>
+                                            <th>Result</th>
+                                            {% if current_user.is_admin and round.status != 'completed' %}
+                                            <th>Actions</th>
+                                            {% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for pairing in round.pairings %}
+                                        <tr>
+                                            <td>{{ pairing.white_player.name }}</td>
+                                            <td>{{ pairing.black_player.name }}</td>
+                                            <td>{{ pairing.result or 'Pending' }}</td>
+                                            {% if current_user.is_admin and round.status != 'completed' %}
+                                            <td>
+                                                <button class="btn btn-sm btn-primary" 
+                                                        onclick="editResult({{ pairing.id }})">
+                                                    Edit Result
+                                                </button>
+                                            </td>
+                                            {% endif %}
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                         {% endfor %}
                     </div>
                     {% else %}
-                    <p>No rounds yet.</p>
+                    <p class="text-center text-muted mt-3">No rounds have been created yet.</p>
                     {% endif %}
-                </div>
-            </div>
 
-            <!-- Result Modal -->
-            <div class="modal fade" id="editResultModal" tabindex="-1" aria-labelledby="editResultModalLabel" aria-hidden="true">
-                <div class="modal-dialog">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="editResultModalLabel">Enter Match Result</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                        </div>
-                        <form id="editResultForm" method="post">
-                            <div class="modal-body">
-                                <div class="mb-3">
-                                    <label for="result" class="form-label">Result</label>
-                                    <select name="result" id="result" class="form-select" required>
-                                        <option value="">-- Select Result --</option>
-                                        <optgroup label="Black Wins">
-                                            <option value="B+R">B+R (Black wins by resignation)</option>
-                                            <option value="B+T">B+T (Black wins by time)</option>
-                                            <option value="B+F">B+F (Black wins by forfeit)</option>
-                                            <option value="B+0.5">B+0.5 (Black wins by 0.5 points)</option>
-                                            <option value="B+1.5">B+1.5 (Black wins by 1.5 points)</option>
-                                            <option value="B+2.5">B+2.5 (Black wins by 2.5 points)</option>
-                                            <option value="B+3.5">B+3.5 (Black wins by 3.5 points)</option>
-                                            <option value="B+4.5">B+4.5 (Black wins by 4.5 points)</option>
-                                            <option value="B+5.5">B+5.5 (Black wins by 5.5 points)</option>
-                                            <option value="B+6.5">B+6.5 (Black wins by 6.5 points)</option>
-                                            <option value="B+7.5">B+7.5 (Black wins by 7.5 points)</option>
-                                            <option value="B+8.5">B+8.5 (Black wins by 8.5 points)</option>
-                                            <option value="B+9.5">B+9.5 (Black wins by 9.5 points)</option>
-                                            <option value="B+10.5">B+10.5 (Black wins by 10.5+ points)</option>
-                                        </optgroup>
-                                        <option value="Jigo">Jigo (Draw)</option>
-                                        <optgroup label="White Wins">
-                                            <option value="W+R">W+R (White wins by resignation)</option>
-                                            <option value="W+T">W+T (White wins by time)</option>
-                                            <option value="W+F">W+F (White wins by forfeit)</option>
-                                            <option value="W+0.5">W+0.5 (White wins by 0.5 points)</option>
-                                            <option value="W+1.5">W+1.5 (White wins by 1.5 points)</option>
-                                            <option value="W+2.5">W+2.5 (White wins by 2.5 points)</option>
-                                            <option value="W+3.5">W+3.5 (White wins by 3.5 points)</option>
-                                            <option value="W+4.5">W+4.5 (White wins by 4.5 points)</option>
-                                            <option value="W+5.5">W+5.5 (White wins by 5.5 points)</option>
-                                            <option value="W+6.5">W+6.5 (White wins by 6.5 points)</option>
-                                            <option value="W+7.5">W+7.5 (White wins by 7.5 points)</option>
-                                            <option value="W+8.5">W+8.5 (White wins by 8.5 points)</option>
-                                            <option value="W+9.5">W+9.5 (White wins by 9.5 points)</option>
-                                            <option value="W+10.5">W+10.5 (White wins by 10.5+ points)</option>
-                                        </optgroup>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                <button type="submit" class="btn btn-primary">Save Result</button>
-                            </div>
-                        </form>
+                    {% if current_user.is_admin and tournament.status != 'completed' %}
+                    <div class="mt-3">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoundModal">
+                            Create Round
+                        </button>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -262,17 +189,40 @@
                         <label class="form-label">Date and Time</label>
                         <input type="datetime-local" class="form-control" name="datetime" required>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Round</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Result Modal -->
+<div class="modal fade" id="editResultModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Match Result</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="editResultForm" method="POST">
+                <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">Pairing System</label>
-                        <select class="form-select" name="pairing_system" required>
-                            <option value="round_robin">Round Robin</option>
-                            <option value="auto">Auto Matchmaking</option>
+                        <label class="form-label">Result</label>
+                        <select class="form-select" name="result" required>
+                            <option value="B+R">Black Wins by Resignation</option>
+                            <option value="W+R">White Wins by Resignation</option>
+                            <option value="B+T">Black Wins on Time</option>
+                            <option value="W+T">White Wins on Time</option>
+                            <option value="Jigo">Draw</option>
                         </select>
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Round</button>
+                    <button type="submit" class="btn btn-primary">Save Result</button>
                 </div>
             </form>
         </div>

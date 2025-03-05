@@ -31,10 +31,9 @@ class PlayerForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(PlayerForm, self).__init__(*args, **kwargs)
-        # Handle empty or string values for file fields
-        if hasattr(self, 'player_photo') and self.player_photo.data == '':
+        if self.player_photo.data == '':
             self.player_photo.data = None
-        if hasattr(self, 'id_card_photo') and self.id_card_photo.data == '':
+        if self.id_card_photo.data == '':
             self.id_card_photo.data = None
 
 class TournamentForm(FlaskForm):
@@ -48,15 +47,14 @@ class TournamentForm(FlaskForm):
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     pairing_system = SelectField('Pairing System', 
-                                choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System'), ('round_robin', 'Round Robin')],
+                                choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
                                 default='swiss')
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
 
     def __init__(self, *args, **kwargs):
         super(TournamentForm, self).__init__(*args, **kwargs)
-        # Handle empty or string values for file field
-        if hasattr(self, 'cover_photo') and self.cover_photo.data == '':
+        if self.cover_photo.data == '':
             self.cover_photo.data = None
 
     def validate_end_date(self, field):
