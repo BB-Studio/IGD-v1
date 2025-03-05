@@ -18,6 +18,14 @@
         {% endif %}
     </div>
 
+    {% if tournament.cover_photo %}
+    <div class="row mb-4">
+        <div class="col">
+            <img src="{{ url_for('static', filename=tournament.cover_photo) }}" alt="Tournament Cover" class="img-fluid rounded">
+        </div>
+    </div>
+    {% endif %}
+
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="card">

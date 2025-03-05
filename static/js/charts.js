@@ -2,7 +2,12 @@
 
 function createPlayerRatingChart(containerId, ratingHistory) {
     const ctx = document.getElementById(containerId);
-    if (!ctx) return;
+    if (!ctx) {
+        console.error('Rating chart container not found:', containerId);
+        return;
+    }
+
+    console.log('Creating rating chart with data:', ratingHistory);
 
     const dates = ratingHistory.map(entry => entry.date);
     const ratings = ratingHistory.map(entry => entry.rating);
@@ -43,7 +48,12 @@ function createPlayerRatingChart(containerId, ratingHistory) {
 
 function createTournamentStatsChart(containerId, playerData) {
     const ctx = document.getElementById(containerId);
-    if (!ctx) return;
+    if (!ctx) {
+        console.error('Tournament stats chart container not found:', containerId);
+        return;
+    }
+
+    console.log('Creating tournament stats chart with data:', playerData);
 
     new Chart(ctx, {
         type: 'bar',
@@ -79,7 +89,12 @@ function createTournamentStatsChart(containerId, playerData) {
 
 function createWinRateChart(containerId, winData) {
     const ctx = document.getElementById(containerId);
-    if (!ctx) return;
+    if (!ctx) {
+        console.error('Win rate chart container not found:', containerId);
+        return;
+    }
+
+    console.log('Creating win rate chart with data:', winData);
 
     new Chart(ctx, {
         type: 'doughnut',

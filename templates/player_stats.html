@@ -104,11 +104,14 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        console.log('Rating History Data:', {{ rating_history|tojson|safe }});
+        console.log('Win Stats Data:', {{ win_stats|tojson|safe }});
+
         // Rating history chart
-        createPlayerRatingChart('ratingChart', {{ rating_history|default([])|tojson }});
+        createPlayerRatingChart('ratingChart', {{ rating_history|tojson|safe }});
 
         // Win rate chart
-        createWinRateChart('winRateChart', {{ win_stats|default({'wins':0, 'losses':0, 'draws':0})|tojson }});
+        createWinRateChart('winRateChart', {{ win_stats|tojson|safe }});
     });
 </script>
 {% endblock %}
