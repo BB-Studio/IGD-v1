@@ -166,12 +166,12 @@ def add_tournament():
                 start_date=form.start_date.data,
                 end_date=form.end_date.data,
                 state=form.state.data,
-                info=form.info.data,
+                info=form.info.data if form.info.data else "",
                 status='upcoming',
                 pairing_system=form.pairing_system.data
             )
 
-            if form.cover_photo.data and form.cover_photo.data.filename:
+            if form.cover_photo.data and hasattr(form.cover_photo.data, 'filename') and form.cover_photo.data.filename:
                 tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
 
             db.session.add(tournament)
@@ -180,12 +180,14 @@ def add_tournament():
             # Add selected players to the tournament
             for player_id in form.players.data:
                 player = Player.query.get(player_id)
-                tournament_player = TournamentPlayer(
-                    tournament=tournament,
-                    player=player,
-                    initial_rating=player.rating
-                )
-                db.session.add(tournament_player)
+                if player:
+                    tournament_player = TournamentPlayer(
+                        tournament=tournament,
+                        player=player,
+                        initial_rating=player.rating,
+                        current_score=0.0
+                    )
+                    db.session.add(tournament_player)
 
             db.session.commit()
             flash('Tournament created successfully!')
@@ -193,6 +195,7 @@ def add_tournament():
         except Exception as e:
             db.session.rollback()
             flash(f'Error creating tournament: {str(e)}', 'error')
+            print(f"Error creating tournament: {str(e)}")  # Debug log
     elif form.errors:
         # Flash form validation errors
         for field, errors in form.errors.items():
@@ -221,51 +224,53 @@ def edit_tournament(tournament_id):
         form.players.data = [tp.player_id for tp in tournament.players]
 
     if form.validate_on_submit():
-        tournament.name = form.name.data
-        tournament.start_date = form.start_date.data
-        tournament.end_date = form.end_date.data
-        tournament.state = form.state.data
-        tournament.info = form.info.data
-        tournament.pairing_system = form.pairing_system.data
-
-        # Only update cover photo if a new one is uploaded
-        if form.cover_photo.data and hasattr(form.cover_photo.data, 'filename') and form.cover_photo.data.filename:
-            old_photo = tournament.cover_photo
-            tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
-            # Delete old photo if it exists
-            if old_photo:
-                try:
-                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
-                except OSError:
-                    pass  # Ignore file deletion errors
-
-        # Update players
-        current_players = set(tp.player_id for tp in tournament.players)
-        new_players = set(form.players.data)
-
-        # Remove players that are no longer selected
-        for tp in tournament.players[:]:
-            if tp.player_id not in new_players:
-                db.session.delete(tp)
-
-        # Add new players
-        for player_id in new_players:
-            if player_id not in current_players:
-                player = Player.query.get(player_id)
-                tournament_player = TournamentPlayer(
-                    tournament=tournament,
-                    player=player,
-                    initial_rating=player.rating
-                )
-                db.session.add(tournament_player)
-
         try:
+            tournament.name = form.name.data
+            tournament.start_date = form.start_date.data
+            tournament.end_date = form.end_date.data
+            tournament.state = form.state.data
+            tournament.info = form.info.data
+            tournament.pairing_system = form.pairing_system.data
+
+            # Only update cover photo if a new one is uploaded
+            if form.cover_photo.data and hasattr(form.cover_photo.data, 'filename') and form.cover_photo.data.filename:
+                old_photo = tournament.cover_photo
+                tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
+                # Delete old photo if it exists
+                if old_photo:
+                    try:
+                        os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                    except OSError:
+                        pass  # Ignore file deletion errors
+
+            # Update players
+            current_players = set(tp.player_id for tp in tournament.players)
+            new_players = set(form.players.data)
+
+            # Remove players that are no longer selected
+            for tp in list(tournament.players):
+                if tp.player_id not in new_players:
+                    db.session.delete(tp)
+
+            # Add new players
+            for player_id in new_players:
+                if player_id not in current_players:
+                    player = Player.query.get(player_id)
+                    if player:
+                        tournament_player = TournamentPlayer(
+                            tournament=tournament,
+                            player=player,
+                            initial_rating=player.rating
+                        )
+                        db.session.add(tournament_player)
+
             db.session.commit()
             flash('Tournament updated successfully!')
             return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating tournament: {str(e)}', 'error')
+            print(f"Error updating tournament: {str(e)}")  # Debug log
     elif form.errors:
         # Flash form validation errors
         for field, errors in form.errors.items():
@@ -489,8 +494,8 @@ def edit_player(player_id):
                 player.email = form.email.data
                 player.phone = form.phone.data
 
-            # Only update photos if new ones are uploaded
-            if form.player_photo.data and form.player_photo.data.filename:
+            # Only update photos if new ones are uploaded and they have filenames
+            if form.player_photo.data and hasattr(form.player_photo.data, 'filename') and form.player_photo.data.filename:
                 old_photo = player.player_photo
                 player.player_photo = save_photo(form.player_photo.data, 'players')
                 # Delete old photo if it exists
@@ -500,7 +505,7 @@ def edit_player(player_id):
                     except OSError:
                         pass
 
-            if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
+            if current_user.is_admin and form.id_card_photo.data and hasattr(form.id_card_photo.data, 'filename') and form.id_card_photo.data.filename:
                 old_photo = player.id_card_photo
                 player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
                 # Delete old photo if it exists
@@ -558,6 +563,9 @@ def create_round(tournament_id):
             flash('Invalid date format. Please use YYYY-MM-DDTHH:MM format.', 'error')
             return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
+        # Get pairing system from form or use tournament default
+        pairing_system = request.form.get('pairing_system', tournament.pairing_system)
+        
         new_round = Round(
             tournament=tournament,
             number=round_number,
@@ -586,28 +594,28 @@ def create_round(tournament_id):
         for r in tournament.rounds:
             if r.id != new_round.id:  # Don't include the current round
                 for pairing in r.pairings:
-                    played_matches.add((pairing.white_player_id, pairing.black_player_id))
-                    played_matches.add((pairing.black_player_id, pairing.white_player_id))
+                    if pairing.black_player_id:  # Only add if not a bye
+                        played_matches.add((pairing.white_player_id, pairing.black_player_id))
+                        played_matches.add((pairing.black_player_id, pairing.white_player_id))
 
-        # Generate pairings based on tournament system
-        if tournament.pairing_system == 'macmahon':
+        # Generate pairings based on tournament system or form selection
+        if pairing_system == 'auto' or pairing_system == 'macmahon':
             pairs = macmahon_pairing(tournament_players, played_matches)
-        elif tournament.pairing_system == 'round_robin':
+        elif pairing_system == 'round_robin':
             pairs = round_robin_pairing(tournament_players, round_number, played_matches)
         else:  # default to Swiss
             pairs = swiss_pairing(tournament_players, played_matches)
 
         # Create pairings
         for white, black in pairs:
-            if black is not None:  # Skip byes
+            if black is not None:  # Regular pairing
                 pairing = RoundPairing(
                     round=new_round,
                     white_player=white,
                     black_player=black
                 )
                 db.session.add(pairing)
-            else:
-                # Create a "bye" entry
+            else:  # Bye
                 pairing = RoundPairing(
                     round=new_round,
                     white_player=white,

@@ -31,9 +31,10 @@ class PlayerForm(FlaskForm):
     
     def __init__(self, *args, **kwargs):
         super(PlayerForm, self).__init__(*args, **kwargs)
-        if self.player_photo.data == '':
+        # Handle empty or string values for file fields
+        if hasattr(self, 'player_photo') and self.player_photo.data == '':
             self.player_photo.data = None
-        if self.id_card_photo.data == '':
+        if hasattr(self, 'id_card_photo') and self.id_card_photo.data == '':
             self.id_card_photo.data = None
 
 class TournamentForm(FlaskForm):
@@ -54,7 +55,8 @@ class TournamentForm(FlaskForm):
 
     def __init__(self, *args, **kwargs):
         super(TournamentForm, self).__init__(*args, **kwargs)
-        if self.cover_photo.data == '':
+        # Handle empty or string values for file field
+        if hasattr(self, 'cover_photo') and self.cover_photo.data == '':
             self.cover_photo.data = None
 
     def validate_end_date(self, field):
