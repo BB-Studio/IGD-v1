@@ -201,9 +201,42 @@ def admin_dashboard():
         'completed': Tournament.query.filter_by(status='completed').count()
     }
 
+    # Add system statistics
+    system_stats = {
+        'db_size': 'N/A',  # This would require additional setup to track
+        'last_backup': datetime.utcnow().strftime('%Y-%m-%d'),
+        'version': '1.0.0'
+    }
+
+    # Get recent activity
+    recent_activity = []
+    # Get last 5 tournaments
+    recent_tournaments = Tournament.query.order_by(Tournament.start_date.desc()).limit(5).all()
+    for tournament in recent_tournaments:
+        recent_activity.append({
+            'date': tournament.start_date,
+            'event_type': 'Tournament Created',
+            'details': f'Tournament: {tournament.name}'
+        })
+
+    # Get last 5 player registrations
+    recent_players = Player.query.order_by(Player.last_active.desc()).limit(5).all()
+    for player in recent_players:
+        recent_activity.append({
+            'date': player.last_active,
+            'event_type': 'Player Registration',
+            'details': f'Player: {player.name}'
+        })
+
+    # Sort combined activity by date
+    recent_activity.sort(key=lambda x: x['date'], reverse=True)
+    recent_activity = recent_activity[:5]  # Keep only the 5 most recent activities
+
     return render_template('admin/dashboard.html', 
                          player_stats=player_stats,
-                         tournament_stats=tournament_stats)
+                         tournament_stats=tournament_stats,
+                         system_stats=system_stats,
+                         recent_activity=recent_activity)
 
 @main_bp.route('/tournament/<int:tournament_id>/complete', methods=['POST'])
 @login_required
@@ -264,3 +297,34 @@ def complete_tournament(tournament_id):
 
     flash('Tournament marked as completed and player ratings have been updated.')
     return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+
+@main_bp.route('/edit_player/<int:player_id>', methods=['GET', 'POST'])
+@login_required
+def edit_player(player_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    player = Player.query.get_or_404(player_id)
+    form = PlayerForm(obj=player)
+
+    if form.validate_on_submit():
+        player.first_name = form.first_name.data
+        player.middle_name = form.middle_name.data
+        player.last_name = form.last_name.data
+        player.state = form.state.data
+        if current_user.is_admin:
+            player.email = form.email.data
+            player.phone = form.phone.data
+
+        if form.player_photo.data:
+            player.player_photo = save_photo(form.player_photo.data, 'players')
+
+        if current_user.is_admin and form.id_card_photo.data:
+            player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
+
+        db.session.commit()
+        flash('Player updated successfully!')
+        return redirect(url_for('main.players'))
+
+    return render_template('add_player.html', form=form, player=player)
