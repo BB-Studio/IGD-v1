@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Create New Tournament</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            {% for error in form.name.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.start_date.label(class="form-label") }}
+                                {{ form.start_date(class="form-control", type="datetime-local") }}
+                                {% for error in form.start_date.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.end_date.label(class="form-label") }}
+                                {{ form.end_date(class="form-control", type="datetime-local") }}
+                                {% for error in form.end_date.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.state.label(class="form-label") }}
+                            {{ form.state(class="form-select") }}
+                            {% for error in form.state.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.info.label(class="form-label") }}
+                            <small class="text-muted d-block mb-2">Markdown formatting is supported</small>
+                            {{ form.info(class="form-control", rows=6) }}
+                            {% for error in form.info.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.cover_photo.label(class="form-label") }}
+                            {{ form.cover_photo(class="form-control") }}
+                            {% for error in form.cover_photo.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                            <small class="text-muted">Supported formats: JPG, PNG</small>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.rounds.label(class="form-label") }}
+                            {{ form.rounds(class="form-control", type="number", min=1) }}
+                            {% for error in form.rounds.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.players.label(class="form-label") }}
+                            {{ form.players(class="form-select", multiple=true, size=10) }}
+                            {% for error in form.players.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                            <small class="text-muted">Hold Ctrl/Cmd to select multiple players</small>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

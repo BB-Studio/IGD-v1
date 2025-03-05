@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Add New Player</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {{ form.hidden_tag() }}
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                {{ form.first_name.label(class="form-label") }}
+                                {{ form.first_name(class="form-control") }}
+                                {% for error in form.first_name.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.middle_name.label(class="form-label") }}
+                                {{ form.middle_name(class="form-control") }}
+                                {% for error in form.middle_name.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form.last_name.label(class="form-label") }}
+                                {{ form.last_name(class="form-control") }}
+                                {% for error in form.last_name.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.state.label(class="form-label") }}
+                            {{ form.state(class="form-select") }}
+                            {% for error in form.state.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                        </div>
+
+                        {% if current_user.is_admin %}
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.email.label(class="form-label") }}
+                                {{ form.email(class="form-control") }}
+                                {% for error in form.email.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.phone.label(class="form-label") }}
+                                {{ form.phone(class="form-control") }}
+                                {% for error in form.phone.errors %}
+                                <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.id_card_photo.label(class="form-label") }}
+                            {{ form.id_card_photo(class="form-control") }}
+                            {% for error in form.id_card_photo.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                            <small class="text-muted">Supported formats: JPG, PNG</small>
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            {{ form.player_photo.label(class="form-label") }}
+                            {{ form.player_photo(class="form-control") }}
+                            {% for error in form.player_photo.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                            <small class="text-muted">Supported formats: JPG, PNG</small>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -20,11 +20,11 @@
                 <div class="card-body">
                     <h5 class="card-title">Tournament Details</h5>
                     <p class="card-text">
-                        <strong>Location:</strong> {{ tournament.location }}<br>
+                        <strong>Location:</strong> {{ tournament.state }}<br>
                         <strong>Start Date:</strong> {{ tournament.start_date.strftime('%Y-%m-%d') }}<br>
                         <strong>End Date:</strong> {{ tournament.end_date.strftime('%Y-%m-%d') }}<br>
                         <strong>Description:</strong><br>
-                        {{ tournament.description }}
+                        {{ tournament_info_html|safe }}
                     </p>
                 </div>
             </div>
@@ -81,6 +81,7 @@
                             <thead>
                                 <tr>
                                     <th>Date</th>
+                                    <th>Round</th>
                                     <th>Black</th>
                                     <th>White</th>
                                     <th>Result</th>
@@ -93,6 +94,7 @@
                                 {% for match in tournament.matches %}
                                 <tr>
                                     <td>{{ match.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>Round {{ match.round_number }} ({{ match.round_start_time.strftime('%H:%M') }})</td>
                                     <td>{{ match.black_player.name }}</td>
                                     <td>{{ match.white_player.name }}</td>
                                     <td>{{ match.result }}</td>
@@ -111,6 +113,18 @@
             </div>
         </div>
     </div>
+
+    {% if current_user.is_admin and tournament.status == 'ongoing' %}
+    <div class="row mt-4">
+        <div class="col">
+            <form method="POST" action="{{ url_for('main.complete_tournament', tournament_id=tournament.id) }}" class="d-inline">
+                <button type="submit" class="btn btn-success" data-confirm="Are you sure you want to mark this tournament as completed? This will update all players' ratings.">
+                    Mark Tournament as Completed
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
