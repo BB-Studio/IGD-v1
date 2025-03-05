@@ -5,8 +5,17 @@
     <div class="row mb-4">
         <div class="col">
             <h2>{{ tournament.name }}</h2>
+            <p class="text-muted">Tournament ID: {{ tournament.tournament_id }}</p>
             <span class="badge badge-{{ tournament.status }}">{{ tournament.status|title }}</span>
         </div>
+        {% if current_user.is_admin and tournament.status != 'completed' %}
+        <div class="col-auto">
+            <a href="{{ url_for('main.edit_tournament', tournament_id=tournament.id) }}" class="btn btn-warning">Edit Tournament</a>
+            <form method="POST" action="{{ url_for('main.delete_tournament', tournament_id=tournament.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this tournament? This action cannot be undone.');">
+                <button type="submit" class="btn btn-danger">Delete Tournament</button>
+            </form>
+        </div>
+        {% endif %}
     </div>
 
     <div class="row mb-4">
@@ -33,6 +42,7 @@
                         <table class="table">
                             <thead>
                                 <tr>
+                                    <th>Player ID</th>
                                     <th>Player</th>
                                     <th>Initial Rating</th>
                                     <th>Current/Final Rating</th>
@@ -42,6 +52,7 @@
                             <tbody>
                                 {% for tp in tournament.players %}
                                 <tr>
+                                    <td>{{ tp.player.player_id }}</td>
                                     <td>{{ tp.player.name }}</td>
                                     <td>{{ "%.2f"|format(tp.initial_rating) }}</td>
                                     <td>{{ "%.2f"|format(tp.final_rating or tp.player.rating) }}</td>
@@ -90,13 +101,15 @@
                                 <tr>
                                     <td>{{ match.date.strftime('%Y-%m-%d') }}</td>
                                     <td>Round {{ match.round_number }} ({{ match.round_start_time.strftime('%H:%M') }})</td>
-                                    <td>{{ match.black_player.name }}</td>
-                                    <td>{{ match.white_player.name }}</td>
+                                    <td>{{ match.black_player.name }} ({{ match.black_player.player_id }})</td>
+                                    <td>{{ match.white_player.name }} ({{ match.white_player.player_id }})</td>
                                     <td>{{ match.result }}</td>
                                     {% if current_user.is_admin and tournament.status == 'ongoing' %}
                                     <td>
                                         <a href="{{ url_for('main.edit_match', match_id=match.id) }}" class="btn btn-warning btn-sm">Edit</a>
-                                        <button class="btn btn-danger btn-sm" data-confirm="Are you sure you want to delete this match?" onclick="deleteMatch({{ match.id }})">Delete</button>
+                                        <form method="POST" action="{{ url_for('main.delete_match', match_id=match.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this match?');">
+                                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                        </form>
                                     </td>
                                     {% endif %}
                                 </tr>

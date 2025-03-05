@@ -24,6 +24,7 @@
             <thead>
                 <tr>
                     <th>Rank</th>
+                    <th>Player ID</th>
                     <th>Name</th>
                     <th>Rating</th>
                     <th>Last Active</th>
@@ -34,6 +35,7 @@
                 {% for player in players %}
                 <tr class="searchable-item">
                     <td>{{ loop.index }}</td>
+                    <td>{{ player.player_id }}</td>
                     <td>{{ player.name }}</td>
                     <td>{{ "%.2f"|format(player.rating) }}</td>
                     <td>{{ player.last_active.strftime('%Y-%m-%d') }}</td>
@@ -41,7 +43,9 @@
                         <a href="{{ url_for('main.player_stats', player_id=player.id) }}" class="btn btn-info btn-sm">Stats</a>
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('main.edit_player', player_id=player.id) }}" class="btn btn-warning btn-sm">Edit</a>
-                        <button class="btn btn-danger btn-sm" data-confirm="Are you sure you want to delete this player?" onclick="deletePLayer({{ player.id }})">Delete</button>
+                        <form method="POST" action="{{ url_for('main.delete_player', player_id=player.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this player? This action cannot be undone.');">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
                         {% endif %}
                     </td>
                 </tr>

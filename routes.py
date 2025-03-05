@@ -127,17 +127,27 @@ def tournaments():
 @main_bp.route('/add_tournament', methods=['GET', 'POST'])
 @login_required
 def add_tournament():
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
     form = TournamentForm()
-    form.players.choices = [(p.id, p.name) for p in Player.query.order_by(Player.rating.desc()).all()]
+    form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     if form.validate_on_submit():
+        # Create upload directories if they don't exist
+        uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
+        tournaments_path = os.path.join(uploads_path, 'tournaments')
+        os.makedirs(tournaments_path, exist_ok=True)
+
         tournament = Tournament(
             name=form.name.data,
             start_date=form.start_date.data,
             end_date=form.end_date.data,
             state=form.state.data,
             info=form.info.data,
-            rounds=form.rounds.data
+            rounds=form.rounds.data,
+            status='upcoming'  # Set initial status
         )
 
         if form.cover_photo.data:
@@ -161,6 +171,120 @@ def add_tournament():
         return redirect(url_for('main.tournaments'))
 
     return render_template('add_tournament.html', form=form)
+
+@main_bp.route('/edit_tournament/<int:tournament_id>', methods=['GET', 'POST'])
+@login_required
+def edit_tournament(tournament_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    tournament = Tournament.query.get_or_404(tournament_id)
+    if tournament.status == 'completed':
+        flash('Completed tournaments cannot be edited.')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+
+    form = TournamentForm(obj=tournament)
+    form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
+    form.players.data = [tp.player_id for tp in tournament.players]
+
+    if form.validate_on_submit():
+        tournament.name = form.name.data
+        tournament.start_date = form.start_date.data
+        tournament.end_date = form.end_date.data
+        tournament.state = form.state.data
+        tournament.info = form.info.data
+        tournament.rounds = form.rounds.data
+
+        if form.cover_photo.data:
+            tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
+
+        # Update players
+        TournamentPlayer.query.filter_by(tournament_id=tournament.id).delete()
+        for player_id in form.players.data:
+            player = Player.query.get(player_id)
+            tournament_player = TournamentPlayer(
+                tournament=tournament,
+                player=player,
+                initial_rating=player.rating
+            )
+            db.session.add(tournament_player)
+
+        db.session.commit()
+        flash('Tournament updated successfully!')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+
+    return render_template('add_tournament.html', form=form, tournament=tournament)
+
+@main_bp.route('/delete_tournament/<int:tournament_id>', methods=['POST'])
+@login_required
+def delete_tournament(tournament_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    tournament = Tournament.query.get_or_404(tournament_id)
+    if tournament.status == 'completed':
+        flash('Completed tournaments cannot be deleted.')
+        return redirect(url_for('main.tournaments'))
+
+    # Delete associated records
+    TournamentPlayer.query.filter_by(tournament_id=tournament.id).delete()
+    Match.query.filter_by(tournament_id=tournament.id).delete()
+
+    # Delete cover photo if exists
+    if tournament.cover_photo:
+        try:
+            os.remove(os.path.join(current_app.root_path, 'static', tournament.cover_photo))
+        except OSError:
+            pass  # Ignore file deletion errors
+
+    db.session.delete(tournament)
+    db.session.commit()
+    flash('Tournament deleted successfully!')
+    return redirect(url_for('main.tournaments'))
+
+@main_bp.route('/delete_player/<int:player_id>', methods=['POST'])
+@login_required
+def delete_player(player_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    player = Player.query.get_or_404(player_id)
+
+    # Check if player is in any ongoing tournaments
+    ongoing_tournaments = TournamentPlayer.query.join(Tournament).filter(
+        TournamentPlayer.player_id == player.id,
+        Tournament.status != 'completed'
+    ).first()
+
+    if ongoing_tournaments:
+        flash('Cannot delete player who is participating in ongoing tournaments.')
+        return redirect(url_for('main.players'))
+
+    # Delete photos if they exist
+    if player.player_photo:
+        try:
+            os.remove(os.path.join(current_app.root_path, 'static', player.player_photo))
+        except OSError:
+            pass
+    if player.id_card_photo:
+        try:
+            os.remove(os.path.join(current_app.root_path, 'static', player.id_card_photo))
+        except OSError:
+            pass
+
+    # Delete associated records
+    TournamentPlayer.query.filter_by(player_id=player.id).delete()
+    Match.query.filter(
+        (Match.black_player_id == player.id) | (Match.white_player_id == player.id)
+    ).delete()
+
+    db.session.delete(player)
+    db.session.commit()
+    flash('Player deleted successfully!')
+    return redirect(url_for('main.players'))
 
 @main_bp.route('/tournament/<int:tournament_id>')
 def tournament_details(tournament_id):
