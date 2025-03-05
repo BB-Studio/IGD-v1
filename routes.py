@@ -7,6 +7,7 @@ import markdown2
 from app import db
 from models import Player, Tournament, Match, TournamentPlayer
 from forms import PlayerForm, TournamentForm, MatchForm
+from glicko import Glicko2  # Added Glicko2 import
 
 main_bp = Blueprint('main', __name__)
 
@@ -67,7 +68,51 @@ def player_stats(player_id):
     recent_matches = Match.query.filter(
         (Match.black_player_id == player_id) | (Match.white_player_id == player_id)
     ).order_by(Match.date.desc()).limit(10).all()
-    return render_template('player_stats.html', player=player, recent_matches=recent_matches)
+
+    # Calculate win stats
+    wins = 0
+    losses = 0
+    draws = 0
+    for match in recent_matches:
+        if match.black_player_id == player_id:
+            if match.result.startswith('B+'): wins += 1
+            elif match.result.startswith('W+'): losses += 1
+            else: draws += 1
+        else:  # player is white
+            if match.result.startswith('W+'): wins += 1
+            elif match.result.startswith('B+'): losses += 1
+            else: draws += 1
+
+    win_stats = {
+        'wins': wins,
+        'losses': losses,
+        'draws': draws
+    }
+
+    # Get rating history from tournament participations
+    tournament_players = TournamentPlayer.query.filter_by(player_id=player_id).all()
+    rating_history = []
+    for tp in tournament_players:
+        if tp.final_rating:  # Only include completed tournaments
+            rating_history.append({
+                'date': tp.tournament.end_date.strftime('%Y-%m-%d'),
+                'rating': tp.final_rating
+            })
+
+    # Add current rating
+    rating_history.append({
+        'date': datetime.utcnow().strftime('%Y-%m-%d'),
+        'rating': player.rating
+    })
+
+    print("win_stats:", win_stats)  # Debug print
+    print("rating_history:", rating_history)  # Debug print
+
+    return render_template('player_stats.html', 
+                         player=player, 
+                         recent_matches=recent_matches,
+                         win_stats=win_stats,
+                         rating_history=rating_history)
 
 @main_bp.route('/tournaments')
 def tournaments():
@@ -121,9 +166,21 @@ def add_tournament():
 def tournament_details(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     markdown_html = markdown2.markdown(tournament.info) if tournament.info else ''
+
+    # Calculate rating changes for each player
+    rating_changes = []
+    for tp in tournament.players:
+        if tp.final_rating:
+            rating_change = tp.final_rating - tp.initial_rating
+            rating_changes.append({
+                'name': tp.player.name,
+                'ratingChange': rating_change
+            })
+
     return render_template('tournament_details.html', 
                          tournament=tournament, 
-                         tournament_info_html=markdown_html)
+                         tournament_info_html=markdown_html,
+                         rating_changes=rating_changes)
 
 @main_bp.route('/admin/dashboard')
 @login_required
@@ -161,9 +218,7 @@ def complete_tournament(tournament_id):
         return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
 
     # Initialize Glicko2 calculator
-    # Assume Glicko2 class is defined elsewhere
-    # from glicko2 import Glicko2
-    glicko2 = Glicko2() # Placeholder - Replace with actual import if needed
+    glicko2 = Glicko2()
 
     # Get all tournament players and their matches
     for tp in tournament.players:

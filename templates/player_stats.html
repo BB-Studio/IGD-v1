@@ -90,10 +90,10 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Rating history chart
-        createPlayerRatingChart('ratingChart', {{ rating_history|tojson }});
-        
+        createPlayerRatingChart('ratingChart', {{ rating_history|default([])|tojson }});
+
         // Win rate chart
-        createWinRateChart('winRateChart', {{ win_stats|tojson }});
+        createWinRateChart('winRateChart', {{ win_stats|default({'wins':0, 'losses':0, 'draws':0})|tojson }});
     });
 </script>
 {% endblock %}
