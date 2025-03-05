@@ -168,7 +168,8 @@ def add_tournament():
                 state=form.state.data,
                 info=form.info.data if form.info.data else "",
                 status='upcoming',
-                pairing_system=form.pairing_system.data
+                pairing_system=form.pairing_system.data,
+                rounds_count=0
             )
 
             if form.cover_photo.data and hasattr(form.cover_photo.data, 'filename') and form.cover_photo.data.filename:
@@ -632,6 +633,8 @@ def create_round(tournament_id):
                 if tp:
                     tp.current_score += 1  # Add a win for the bye
 
+        # Update tournament rounds_count
+        tournament.rounds_count = round_number
         db.session.commit()
         flash(f'Round {round_number} created successfully!')
 

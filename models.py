@@ -95,12 +95,13 @@ class Tournament(db.Model):
     cover_photo = db.Column(db.String(255))  # Path to cover photo
     status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed
     pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon, round_robin
+    rounds_count = db.Column(db.Integer, default=0)  # Explicit column for rounds count
     players = db.relationship('TournamentPlayer', backref='tournament', lazy=True, cascade="all, delete-orphan")
     rounds = db.relationship('Round', backref='tournament', lazy=True, cascade="all, delete-orphan")
     
     # This ensures compatibility with existing database
     @property
-    def rounds_count(self):
+    def get_rounds_count(self):
         return len(self.rounds)
 
 class Round(db.Model):
