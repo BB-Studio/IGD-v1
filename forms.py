@@ -28,6 +28,13 @@ class PlayerForm(FlaskForm):
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     submit = SubmitField('Submit')
+    
+    def __init__(self, *args, **kwargs):
+        super(PlayerForm, self).__init__(*args, **kwargs)
+        if self.player_photo.data == '':
+            self.player_photo.data = None
+        if self.id_card_photo.data == '':
+            self.id_card_photo.data = None
 
 class TournamentForm(FlaskForm):
     name = StringField('Tournament Name', validators=[DataRequired(), Length(max=100)])
@@ -44,6 +51,11 @@ class TournamentForm(FlaskForm):
                                 default='swiss')
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
+
+    def __init__(self, *args, **kwargs):
+        super(TournamentForm, self).__init__(*args, **kwargs)
+        if self.cover_photo.data == '':
+            self.cover_photo.data = None
 
     def validate_end_date(self, field):
         if field.data <= self.start_date.data:
