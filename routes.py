@@ -332,10 +332,18 @@ def tournament_details(tournament_id):
                 'ratingChange': rating_change
             })
 
+    # Add system statistics
+    system_stats = {
+        'db_size': 'N/A',  # This would require additional setup to track
+        'last_backup': datetime.utcnow().strftime('%Y-%m-%d'),
+        'version': '1.0.0'
+    }
+
     return render_template('tournament_details.html', 
                          tournament=tournament, 
                          tournament_info_html=markdown_html,
-                         rating_changes=rating_changes)
+                         rating_changes=rating_changes,
+                         system_stats=system_stats)
 
 @main_bp.route('/admin/dashboard')
 @login_required
