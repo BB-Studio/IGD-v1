@@ -4,6 +4,7 @@ from wtforms import StringField, PasswordField, BooleanField, SubmitField, DateT
 from wtforms import TextAreaField, SelectField, IntegerField, SelectMultipleField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Optional
 from models import User, INDIAN_STATES
+from datetime import datetime
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -29,8 +30,8 @@ class PlayerForm(FlaskForm):
 
 class TournamentForm(FlaskForm):
     name = StringField('Tournament Name', validators=[DataRequired()])
-    start_date = DateTimeField('Start Date', validators=[DataRequired()])
-    end_date = DateTimeField('End Date', validators=[DataRequired()])
+    start_date = DateTimeField('Start Date', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
+    end_date = DateTimeField('End Date', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     state = SelectField('State', choices=[(state, state) for state in INDIAN_STATES], validators=[DataRequired()])
     info = TextAreaField('Tournament Information (Markdown supported)')
     cover_photo = FileField('Tournament Cover Photo', validators=[
@@ -41,10 +42,18 @@ class TournamentForm(FlaskForm):
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
 
+    def validate_end_date(self, field):
+        if field.data <= self.start_date.data:
+            raise ValidationError('End date must be after start date')
+
 class MatchForm(FlaskForm):
     black_player = SelectField('Black Player', coerce=int, validators=[DataRequired()])
     white_player = SelectField('White Player', coerce=int, validators=[DataRequired()])
     round_number = IntegerField('Round Number', validators=[DataRequired()])
-    round_start_time = DateTimeField('Round Start Time', validators=[DataRequired()])
+    round_start_time = DateTimeField('Round Start Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
     result = StringField('Result', validators=[DataRequired()])
     submit = SubmitField('Submit')
+
+    def validate_white_player(self, field):
+        if field.data == self.black_player.data:
+            raise ValidationError('Black and White players must be different')

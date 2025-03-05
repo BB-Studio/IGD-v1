@@ -92,6 +92,16 @@ def player_stats(player_id):
     # Get rating history from tournament participations
     tournament_players = TournamentPlayer.query.filter_by(player_id=player_id).all()
     rating_history = []
+
+    # Add initial rating point
+    first_tournament = min(tournament_players, key=lambda tp: tp.tournament.start_date) if tournament_players else None
+    if first_tournament:
+        rating_history.append({
+            'date': first_tournament.tournament.start_date.strftime('%Y-%m-%d'),
+            'rating': first_tournament.initial_rating
+        })
+
+    # Add rating changes from tournaments
     for tp in tournament_players:
         if tp.final_rating:  # Only include completed tournaments
             rating_history.append({
@@ -99,14 +109,18 @@ def player_stats(player_id):
                 'rating': tp.final_rating
             })
 
-    # Add current rating
-    rating_history.append({
-        'date': datetime.utcnow().strftime('%Y-%m-%d'),
-        'rating': player.rating
-    })
+    # Add current rating if different from last tournament rating
+    if not rating_history or rating_history[-1]['rating'] != player.rating:
+        rating_history.append({
+            'date': datetime.utcnow().strftime('%Y-%m-%d'),
+            'rating': player.rating
+        })
 
-    print("win_stats:", win_stats)  # Debug print
-    print("rating_history:", rating_history)  # Debug print
+    # Sort rating history by date
+    rating_history.sort(key=lambda x: x['date'])
+
+    print("Debug - win_stats:", win_stats)  # Debug print
+    print("Debug - rating_history:", rating_history)  # Debug print
 
     return render_template('player_stats.html', 
                          player=player, 
@@ -135,6 +149,11 @@ def add_tournament():
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     if form.validate_on_submit():
+        # Debug logging
+        print("Debug - Start Date:", form.start_date.data)
+        print("Debug - End Date:", form.end_date.data)
+        print("Debug - Form Data:", form.data)
+
         # Create upload directories if they don't exist
         uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
         tournaments_path = os.path.join(uploads_path, 'tournaments')
@@ -170,6 +189,10 @@ def add_tournament():
         flash('Tournament created successfully!')
         return redirect(url_for('main.tournaments'))
 
+    # Debug logging for GET request
+    if request.method == 'GET':
+        print("Debug - Form Errors:", form.errors)
+
     return render_template('add_tournament.html', form=form)
 
 @main_bp.route('/edit_tournament/<int:tournament_id>', methods=['GET', 'POST'])
@@ -186,7 +209,15 @@ def edit_tournament(tournament_id):
 
     form = TournamentForm(obj=tournament)
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
-    form.players.data = [tp.player_id for tp in tournament.players]
+
+    # Set current players and format dates when displaying the form
+    if not form.is_submitted():
+        form.players.data = [tp.player_id for tp in tournament.players]
+        # Format dates for datetime-local input
+        if tournament.start_date:
+            form.start_date.data = tournament.start_date
+        if tournament.end_date:
+            form.end_date.data = tournament.end_date
 
     if form.validate_on_submit():
         tournament.name = form.name.data

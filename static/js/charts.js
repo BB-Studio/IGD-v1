@@ -88,9 +88,9 @@ function createWinRateChart(containerId, winData) {
             datasets: [{
                 data: [winData.wins, winData.losses, winData.draws],
                 backgroundColor: [
-                    'rgba(40, 167, 69, 0.7)',
-                    'rgba(220, 53, 69, 0.7)',
-                    'rgba(108, 117, 125, 0.7)'
+                    'rgba(40, 167, 69, 0.7)',  // Green for wins
+                    'rgba(220, 53, 69, 0.7)',  // Red for losses
+                    'rgba(108, 117, 125, 0.7)' // Gray for draws
                 ]
             }]
         },

@@ -5,6 +5,7 @@
     <div class="row mb-4">
         <div class="col">
             <h2>{{ player.name }}'s Statistics</h2>
+            <p class="text-muted">Player ID: {{ player.player_id }}</p>
         </div>
         {% if current_user.is_admin %}
         <div class="col-auto">
@@ -45,6 +46,13 @@
                     </p>
                 </div>
             </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Performance Summary</h5>
+                    <canvas id="winRateChart"></canvas>
+                </div>
+            </div>
         </div>
 
         <div class="col-md-8">
@@ -54,11 +62,7 @@
                     <canvas id="ratingChart"></canvas>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <div class="row">
-        <div class="col-md-6">
             <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Recent Matches</h5>
@@ -90,15 +94,6 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6">
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h5 class="card-title">Tournament Performance</h5>
-                    <canvas id="winRateChart"></canvas>
                 </div>
             </div>
         </div>

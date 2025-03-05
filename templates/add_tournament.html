@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Create New Tournament</h3>
+                    <h3 class="card-title">{{ 'Edit' if tournament else 'Create New' }} Tournament</h3>
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
@@ -22,14 +22,14 @@
                         <div class="row mb-3">
                             <div class="col-md-6">
                                 {{ form.start_date.label(class="form-label") }}
-                                {{ form.start_date(class="form-control", type="datetime-local") }}
+                                {{ form.start_date(class="form-control", type="datetime-local", required=true) }}
                                 {% for error in form.start_date.errors %}
                                 <span class="text-danger">{{ error }}</span>
                                 {% endfor %}
                             </div>
                             <div class="col-md-6">
                                 {{ form.end_date.label(class="form-label") }}
-                                {{ form.end_date(class="form-control", type="datetime-local") }}
+                                {{ form.end_date(class="form-control", type="datetime-local", required=true) }}
                                 {% for error in form.end_date.errors %}
                                 <span class="text-danger">{{ error }}</span>
                                 {% endfor %}
