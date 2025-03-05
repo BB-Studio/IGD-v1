@@ -479,43 +479,53 @@ def edit_player(player_id):
     player = Player.query.get_or_404(player_id)
     form = PlayerForm(obj=player)
 
+    # When showing the form initially (GET request)
+    if request.method == 'GET':
+        # No need to set form fields as they're already populated with obj=player
+        pass
+
     if form.validate_on_submit():
-        player.first_name = form.first_name.data
-        player.middle_name = form.middle_name.data
-        player.last_name = form.last_name.data
-        player.state = form.state.data
-        if current_user.is_admin:
-            player.email = form.email.data
-            player.phone = form.phone.data
-
-        # Only update photos if new ones are uploaded
-        if form.player_photo.data and form.player_photo.data.filename:
-            old_photo = player.player_photo
-            player.player_photo = save_photo(form.player_photo.data, 'players')
-            # Delete old photo if it exists
-            if old_photo:
-                try:
-                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
-                except OSError:
-                    pass
-
-        if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
-            old_photo = player.id_card_photo
-            player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
-            # Delete old photo if it exists
-            if old_photo:
-                try:
-                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
-                except OSError:
-                    pass
-
         try:
+            player.first_name = form.first_name.data
+            player.middle_name = form.middle_name.data
+            player.last_name = form.last_name.data
+            player.state = form.state.data
+            if current_user.is_admin:
+                player.email = form.email.data
+                player.phone = form.phone.data
+
+            # Only update photos if new ones are uploaded
+            if form.player_photo.data and form.player_photo.data.filename:
+                old_photo = player.player_photo
+                player.player_photo = save_photo(form.player_photo.data, 'players')
+                # Delete old photo if it exists
+                if old_photo:
+                    try:
+                        os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                    except OSError:
+                        pass
+
+            if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
+                old_photo = player.id_card_photo
+                player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
+                # Delete old photo if it exists
+                if old_photo:
+                    try:
+                        os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                    except OSError:
+                        pass
+
             db.session.commit()
             flash('Player updated successfully!')
             return redirect(url_for('main.players'))
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating player: {str(e)}', 'error')
+    elif form.errors:
+        # Flash form validation errors
+        for field, errors in form.errors.items():
+            for error in errors:
+                flash(f"Error in {field}: {error}", 'error')
 
     return render_template('add_player.html', form=form, player=player)
 
