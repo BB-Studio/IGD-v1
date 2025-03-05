@@ -6,9 +6,9 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import markdown2
 from app import db
-from models import Player, Tournament, Match, TournamentPlayer, Round, RoundPairing # Added Round and RoundPairing imports
-from forms import PlayerForm, TournamentForm, MatchForm
-from glicko import Glicko2  # Added Glicko2 import
+from models import Player, Tournament, Match, TournamentPlayer, Round, RoundPairing
+from forms import PlayerForm, TournamentForm  
+from glicko import Glicko2
 
 main_bp = Blueprint('main', __name__)
 
@@ -205,11 +205,6 @@ def edit_tournament(tournament_id):
     # Set current players when displaying the form
     if not form.is_submitted():
         form.players.data = [tp.player_id for tp in tournament.players]
-        # Format dates for datetime-local input
-        if tournament.start_date:
-            form.start_date.data = tournament.start_date
-        if tournament.end_date:
-            form.end_date.data = tournament.end_date
 
     if form.validate_on_submit():
         tournament.name = form.name.data
@@ -219,6 +214,7 @@ def edit_tournament(tournament_id):
         tournament.info = form.info.data
         tournament.pairing_system = form.pairing_system.data
 
+        # Only update cover photo if a new one is uploaded
         if form.cover_photo.data:
             old_photo = tournament.cover_photo
             tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
@@ -230,19 +226,32 @@ def edit_tournament(tournament_id):
                     pass  # Ignore file deletion errors
 
         # Update players
-        TournamentPlayer.query.filter_by(tournament_id=tournament.id).delete()
-        for player_id in form.players.data:
-            player = Player.query.get(player_id)
-            tournament_player = TournamentPlayer(
-                tournament=tournament,
-                player=player,
-                initial_rating=player.rating
-            )
-            db.session.add(tournament_player)
+        current_players = set(tp.player_id for tp in tournament.players)
+        new_players = set(form.players.data)
 
-        db.session.commit()
-        flash('Tournament updated successfully!')
-        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+        # Remove players that are no longer selected
+        for tp in tournament.players[:]:
+            if tp.player_id not in new_players:
+                db.session.delete(tp)
+
+        # Add new players
+        for player_id in new_players:
+            if player_id not in current_players:
+                player = Player.query.get(player_id)
+                tournament_player = TournamentPlayer(
+                    tournament=tournament,
+                    player=player,
+                    initial_rating=player.rating
+                )
+                db.session.add(tournament_player)
+
+        try:
+            db.session.commit()
+            flash('Tournament updated successfully!')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating tournament: {str(e)}', 'error')
 
     return render_template('add_tournament.html', form=form, tournament=tournament)
 
@@ -469,7 +478,7 @@ def edit_player(player_id):
                 try:
                     os.remove(os.path.join(current_app.root_path, 'static', old_photo))
                 except OSError:
-                    pass  # Ignore file deletion errors
+                    pass
 
         if current_user.is_admin and form.id_card_photo.data:
             old_photo = player.id_card_photo
@@ -479,11 +488,15 @@ def edit_player(player_id):
                 try:
                     os.remove(os.path.join(current_app.root_path, 'static', old_photo))
                 except OSError:
-                    pass  # Ignore file deletion errors
+                    pass
 
-        db.session.commit()
-        flash('Player updated successfully!')
-        return redirect(url_for('main.players'))
+        try:
+            db.session.commit()
+            flash('Player updated successfully!')
+            return redirect(url_for('main.players'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating player: {str(e)}', 'error')
 
     return render_template('add_player.html', form=form, player=player)
 

@@ -60,6 +60,19 @@
                             <span class="text-danger">{{ error }}</span>
                             {% endfor %}
                             <small class="text-muted">Supported formats: JPG, PNG</small>
+                            {% if tournament and tournament.cover_photo %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('static', filename=tournament.cover_photo) }}" alt="Current cover photo" class="img-thumbnail" style="max-height: 100px">
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.pairing_system.label(class="form-label") }}
+                            {{ form.pairing_system(class="form-select") }}
+                            {% for error in form.pairing_system.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
                         </div>
 
                         <div class="mb-3">

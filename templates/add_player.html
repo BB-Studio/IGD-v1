@@ -6,7 +6,7 @@
         <div class="col-md-8">
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">Add New Player</h3>
+                    <h3 class="card-title">{{ 'Edit' if player else 'Add New' }} Player</h3>
                 </div>
                 <div class="card-body">
                     <form method="POST" enctype="multipart/form-data">
@@ -60,15 +60,6 @@
                                 {% endfor %}
                             </div>
                         </div>
-
-                        <div class="mb-3">
-                            {{ form.id_card_photo.label(class="form-label") }}
-                            {{ form.id_card_photo(class="form-control") }}
-                            {% for error in form.id_card_photo.errors %}
-                            <span class="text-danger">{{ error }}</span>
-                            {% endfor %}
-                            <small class="text-muted">Supported formats: JPG, PNG</small>
-                        </div>
                         {% endif %}
 
                         <div class="mb-3">
@@ -78,7 +69,28 @@
                             <span class="text-danger">{{ error }}</span>
                             {% endfor %}
                             <small class="text-muted">Supported formats: JPG, PNG</small>
+                            {% if player and player.player_photo %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('static', filename=player.player_photo) }}" alt="Current player photo" class="img-thumbnail" style="max-height: 100px">
+                            </div>
+                            {% endif %}
                         </div>
+
+                        {% if current_user.is_admin %}
+                        <div class="mb-3">
+                            {{ form.id_card_photo.label(class="form-label") }}
+                            {{ form.id_card_photo(class="form-control") }}
+                            {% for error in form.id_card_photo.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                            {% endfor %}
+                            <small class="text-muted">Supported formats: JPG, PNG</small>
+                            {% if player and player.id_card_photo %}
+                            <div class="mt-2">
+                                <img src="{{ url_for('static', filename=player.id_card_photo) }}" alt="Current ID card photo" class="img-thumbnail" style="max-height: 100px">
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endif %}
 
                         <div class="d-grid gap-2">
                             {{ form.submit(class="btn btn-primary") }}

@@ -1,10 +1,9 @@
 from flask_wtf import FlaskForm
-from flask_wtf.file import FileField, FileAllowed, FileRequired
+from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, DateTimeField
-from wtforms import TextAreaField, SelectField, IntegerField, SelectMultipleField
+from wtforms import TextAreaField, SelectField, SelectMultipleField
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Optional
 from models import User, INDIAN_STATES
-from datetime import datetime
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -17,22 +16,15 @@ class PlayerForm(FlaskForm):
     middle_name = StringField('Middle Name', validators=[Optional()])
     last_name = StringField('Last Name', validators=[DataRequired()])
     state = SelectField('State', choices=[(state, state) for state in INDIAN_STATES], validators=[DataRequired()])
-    email = StringField('Email', validators=[DataRequired(), Email()])
-    phone = StringField('Phone Number')
-    id_card_photo = FileField('ID Card Photo', validators=[
-        FileAllowed(['jpg', 'png'], 'Images only!')
-    ])
+    email = StringField('Email', validators=[Optional(), Email()])
+    phone = StringField('Phone Number', validators=[Optional()])
     player_photo = FileField('Player Photo', validators=[
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
+    id_card_photo = FileField('ID Card Photo', validators=[
+        FileAllowed(['jpg', 'png'], 'Images only!')
+    ])
     submit = SubmitField('Submit')
-
-    def __init__(self, *args, **kwargs):
-        super(PlayerForm, self).__init__(*args, **kwargs)
-        if kwargs.get('obj') is not None:  # If editing existing player
-            # Make photos optional when editing
-            self.player_photo.validators = [FileAllowed(['jpg', 'png'], 'Images only!')]
-            self.id_card_photo.validators = [FileAllowed(['jpg', 'png'], 'Images only!')]
 
 class TournamentForm(FlaskForm):
     name = StringField('Tournament Name', validators=[DataRequired()])
@@ -49,23 +41,6 @@ class TournamentForm(FlaskForm):
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
 
-    def __init__(self, *args, **kwargs):
-        super(TournamentForm, self).__init__(*args, **kwargs)
-        if kwargs.get('obj') is None:  # If creating new tournament
-            self.cover_photo.validators.append(FileRequired())
-
     def validate_end_date(self, field):
         if field.data <= self.start_date.data:
             raise ValidationError('End date must be after start date')
-
-class MatchForm(FlaskForm):
-    black_player = SelectField('Black Player', coerce=int, validators=[DataRequired()])
-    white_player = SelectField('White Player', coerce=int, validators=[DataRequired()])
-    round_number = IntegerField('Round Number', validators=[DataRequired()])
-    round_start_time = DateTimeField('Round Start Time', format='%Y-%m-%dT%H:%M', validators=[DataRequired()])
-    result = StringField('Result', validators=[DataRequired()])
-    submit = SubmitField('Submit')
-
-    def validate_white_player(self, field):
-        if field.data == self.black_player.data:
-            raise ValidationError('Black and White players must be different')
