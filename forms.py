@@ -1,7 +1,8 @@
 from flask_wtf import FlaskForm
 from flask_wtf.file import FileField, FileAllowed
 from wtforms import StringField, PasswordField, BooleanField, SubmitField, DateTimeField
-from wtforms import TextAreaField, SelectField, SelectMultipleField, Length
+from wtforms import TextAreaField, SelectField, SelectMultipleField
+from wtforms.validators import Length
 from wtforms.validators import DataRequired, Email, EqualTo, ValidationError, Optional
 from models import User, INDIAN_STATES
 
