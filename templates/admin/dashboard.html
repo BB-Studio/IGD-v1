@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Admin Dashboard</h2>
+
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card admin-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Player Management</h5>
+                    <p class="card-text">
+                        Total Players: {{ player_stats.total }}<br>
+                        Active Players: {{ player_stats.active }}<br>
+                        Average Rating: {{ "%.2f"|format(player_stats.avg_rating) }}
+                    </p>
+                    <a href="{{ url_for('main.players') }}" class="btn btn-primary">Manage Players</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card admin-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Tournament Management</h5>
+                    <p class="card-text">
+                        Ongoing: {{ tournament_stats.ongoing }}<br>
+                        Upcoming: {{ tournament_stats.upcoming }}<br>
+                        Completed: {{ tournament_stats.completed }}
+                    </p>
+                    <a href="{{ url_for('main.tournaments') }}" class="btn btn-primary">Manage Tournaments</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 mb-4">
+            <div class="card admin-card h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Actions</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{{ url_for('main.add_player') }}" class="btn btn-success">Add Player</a>
+                        <a href="{{ url_for('main.add_tournament') }}" class="btn btn-info">Create Tournament</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Activity</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Event</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in recent_activity %}
+                                <tr>
+                                    <td>{{ activity.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ activity.event_type }}</td>
+                                    <td>{{ activity.details }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">System Status</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <tbody>
+                                <tr>
+                                    <th>Database Size</th>
+                                    <td>{{ system_stats.db_size }}</td>
+                                </tr>
+                                <tr>
+                                    <th>Last Backup</th>
+                                    <td>{{ system_stats.last_backup }}</td>
+                                </tr>
+                                <tr>
+                                    <th>System Version</th>
+                                    <td>{{ system_stats.version }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

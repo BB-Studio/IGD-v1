@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>Players Directory</h2>
+        </div>
+        {% if current_user.is_admin %}
+        <div class="col-auto">
+            <a href="{{ url_for('main.add_player') }}" class="btn btn-primary">Add Player</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row mb-3">
+        <div class="col">
+            <input type="text" id="searchInput" class="form-control" placeholder="Search players...">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Name</th>
+                    <th>Rating</th>
+                    <th>Last Active</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for player in players %}
+                <tr class="searchable-item">
+                    <td>{{ loop.index }}</td>
+                    <td>{{ player.name }}</td>
+                    <td>{{ "%.2f"|format(player.rating) }}</td>
+                    <td>{{ player.last_active.strftime('%Y-%m-%d') }}</td>
+                    <td>
+                        <a href="{{ url_for('main.player_stats', player_id=player.id) }}" class="btn btn-info btn-sm">Stats</a>
+                        {% if current_user.is_admin %}
+                        <a href="{{ url_for('main.edit_player', player_id=player.id) }}" class="btn btn-warning btn-sm">Edit</a>
+                        <button class="btn btn-danger btn-sm" data-confirm="Are you sure you want to delete this player?" onclick="deletePLayer({{ player.id }})">Delete</button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

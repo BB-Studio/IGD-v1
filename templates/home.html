@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <h2>Top Players</h2>
+        <div class="card">
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>Name</th>
+                            <th>Rating</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for player in top_players %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td><a href="{{ url_for('main.player_stats', player_id=player.id) }}">{{ player.name }}</a></td>
+                            <td>{{ "%.2f"|format(player.rating) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <h2>Tournament Updates</h2>
+        
+        <h4 class="mt-4">Ongoing Tournaments</h4>
+        {% for tournament in ongoing_tournaments %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ tournament.name }}</h5>
+                <p class="card-text">
+                    Location: {{ tournament.location }}<br>
+                    Ends: {{ tournament.end_date.strftime('%Y-%m-%d') }}
+                </p>
+                <a href="{{ url_for('main.tournament_details', tournament_id=tournament.id) }}" class="btn btn-primary btn-sm">Details</a>
+            </div>
+        </div>
+        {% endfor %}
+
+        <h4 class="mt-4">Upcoming Tournaments</h4>
+        {% for tournament in upcoming_tournaments %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ tournament.name }}</h5>
+                <p class="card-text">
+                    Location: {{ tournament.location }}<br>
+                    Starts: {{ tournament.start_date.strftime('%Y-%m-%d') }}
+                </p>
+                <a href="{{ url_for('main.tournament_details', tournament_id=tournament.id) }}" class="btn btn-primary btn-sm">Details</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

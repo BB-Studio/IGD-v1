@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>{{ player.name }}'s Statistics</h2>
+        </div>
+        {% if current_user.is_admin %}
+        <div class="col-auto">
+            <a href="{{ url_for('main.edit_player', player_id=player.id) }}" class="btn btn-warning">Edit Player</a>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card player-stats-card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Current Rating</h5>
+                    <h2 class="card-text">{{ "%.2f"|format(player.rating) }}</h2>
+                    <p class="text-muted">
+                        Deviation: {{ "%.2f"|format(player.rating_deviation) }}<br>
+                        Volatility: {{ "%.3f"|format(player.volatility) }}
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Rating History</h5>
+                    <canvas id="ratingChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Recent Matches</h5>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Tournament</th>
+                                    <th>Opponent</th>
+                                    <th>Result</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for match in recent_matches %}
+                                <tr>
+                                    <td>{{ match.date.strftime('%Y-%m-%d') }}</td>
+                                    <td>{{ match.tournament.name }}</td>
+                                    <td>
+                                        {% if match.black_player_id == player.id %}
+                                            vs {{ match.white_player.name }} (W)
+                                        {% else %}
+                                            vs {{ match.black_player.name }} (B)
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ match.result }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">Tournament Performance</h5>
+                    <canvas id="winRateChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Rating history chart
+        createPlayerRatingChart('ratingChart', {{ rating_history|tojson }});
+        
+        // Win rate chart
+        createWinRateChart('winRateChart', {{ win_stats|tojson }});
+    });
+</script>
+{% endblock %}
