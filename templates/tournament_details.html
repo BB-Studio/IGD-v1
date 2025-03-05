@@ -7,11 +7,6 @@
             <h2>{{ tournament.name }}</h2>
             <span class="badge badge-{{ tournament.status }}">{{ tournament.status|title }}</span>
         </div>
-        {% if current_user.is_admin %}
-        <div class="col-auto">
-            <a href="{{ url_for('main.edit_tournament', tournament_id=tournament.id) }}" class="btn btn-warning">Edit Tournament</a>
-        </div>
-        {% endif %}
     </div>
 
     <div class="row mb-4">

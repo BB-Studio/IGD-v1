@@ -17,6 +17,26 @@
         <div class="col-md-4">
             <div class="card player-stats-card mb-4">
                 <div class="card-body">
+                    <h5 class="card-title">Player Information</h5>
+                    <p class="card-text">
+                        <strong>Name:</strong> {{ player.name }}<br>
+                        <strong>State:</strong> {{ player.state }}<br>
+                        {% if current_user.is_admin %}
+                        <strong>Email:</strong> {{ player.email }}<br>
+                        <strong>Phone:</strong> {{ player.phone }}<br>
+                        {% if player.id_card_photo %}
+                        <strong>ID Card:</strong> <a href="{{ url_for('static', filename=player.id_card_photo) }}" target="_blank">View ID</a><br>
+                        {% endif %}
+                        {% endif %}
+                        {% if player.player_photo %}
+                        <img src="{{ url_for('static', filename=player.player_photo) }}" alt="Player Photo" class="img-fluid mt-2 rounded">
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+
+            <div class="card player-stats-card mb-4">
+                <div class="card-body">
                     <h5 class="card-title">Current Rating</h5>
                     <h2 class="card-text">{{ "%.2f"|format(player.rating) }}</h2>
                     <p class="text-muted">
