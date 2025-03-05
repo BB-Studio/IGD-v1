@@ -150,13 +150,18 @@ def add_tournament():
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     if form.validate_on_submit():
+        # Create upload directories if they don't exist
+        uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
+        tournaments_path = os.path.join(uploads_path, 'tournaments')
+        os.makedirs(tournaments_path, exist_ok=True)
+
         tournament = Tournament(
             name=form.name.data,
             start_date=form.start_date.data,
             end_date=form.end_date.data,
             state=form.state.data,
             info=form.info.data,
-            status='upcoming',  # Set initial status
+            status='upcoming',
             pairing_system=form.pairing_system.data
         )
 
@@ -178,7 +183,7 @@ def add_tournament():
 
         db.session.commit()
         flash('Tournament created successfully!')
-        return redirect(url_for('main.tournaments'))
+        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
 
     return render_template('add_tournament.html', form=form)
 
@@ -455,71 +460,32 @@ def edit_player(player_id):
             player.email = form.email.data
             player.phone = form.phone.data
 
+        # Only update photos if new ones are uploaded
         if form.player_photo.data:
+            old_photo = player.player_photo
             player.player_photo = save_photo(form.player_photo.data, 'players')
+            # Delete old photo if it exists
+            if old_photo:
+                try:
+                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                except OSError:
+                    pass  # Ignore file deletion errors
 
         if current_user.is_admin and form.id_card_photo.data:
+            old_photo = player.id_card_photo
             player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
+            # Delete old photo if it exists
+            if old_photo:
+                try:
+                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                except OSError:
+                    pass  # Ignore file deletion errors
 
         db.session.commit()
         flash('Player updated successfully!')
         return redirect(url_for('main.players'))
 
     return render_template('add_player.html', form=form, player=player)
-
-
-def swiss_pairing(players):
-    """
-    Implementation of Swiss pairing system
-    """
-    # Sort players by rating
-    sorted_players = sorted(players, key=lambda x: x.rating, reverse=True)
-    pairs = []
-
-    # Simple pairing: match players with closest ratings
-    for i in range(0, len(sorted_players), 2):
-        if i + 1 < len(sorted_players):
-            # Randomly assign colors
-            if random.random() > 0.5:
-                pairs.append((sorted_players[i], sorted_players[i+1]))
-            else:
-                pairs.append((sorted_players[i+1], sorted_players[i]))
-
-    # If odd number of players, last player gets a bye
-    if len(sorted_players) % 2 == 1:
-        pairs.append((sorted_players[-1], None))
-
-    return pairs
-
-def macmahon_pairing(players):
-    """
-    Implementation of MacMahon pairing system
-    """
-    # Group players by score/rating
-    player_groups = {}
-    for player in players:
-        score = player.current_score
-        if score not in player_groups:
-            player_groups[score] = []
-        player_groups[score].append(player)
-
-    pairs = []
-    unpaired = []
-
-    # Pair within same score groups first
-    for score in sorted(player_groups.keys(), reverse=True):
-        group = player_groups[score]
-        group_pairs = swiss_pairing(group)
-        pairs.extend([p for p in group_pairs if p[1] is not None])
-        if any(p[1] is None for p in group_pairs):
-            unpaired.extend([p[0] for p in group_pairs if p[1] is None])
-
-    # Pair remaining players across groups
-    if unpaired:
-        cross_pairs = swiss_pairing(unpaired)
-        pairs.extend(cross_pairs)
-
-    return pairs
 
 @main_bp.route('/tournament/<int:tournament_id>/round', methods=['POST'])
 @login_required
@@ -535,12 +501,12 @@ def create_round(tournament_id):
         flash('Cannot create rounds for completed tournaments.')
         return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
-    # Update tournament status to ongoing if it's not already
-    if tournament.status == 'upcoming':
-        tournament.status = 'ongoing'
-        db.session.commit()
-
     try:
+        # Update tournament status to ongoing if it's not already
+        if tournament.status == 'upcoming':
+            tournament.status = 'ongoing'
+            db.session.commit()
+
         # Create new round
         round_number = len(tournament.rounds) + 1
         round_datetime = datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M')
@@ -690,3 +656,56 @@ def complete_round(round_id):
 
     db.session.commit()
     return jsonify({'success': True})
+
+def swiss_pairing(players):
+    """
+    Implementation of Swiss pairing system
+    """
+    # Sort players by rating
+    sorted_players = sorted(players, key=lambda x: x.rating, reverse=True)
+    pairs = []
+
+    # Simple pairing: match players with closest ratings
+    for i in range(0, len(sorted_players), 2):
+        if i + 1 < len(sorted_players):
+            # Randomly assign colors
+            if random.random() > 0.5:
+                pairs.append((sorted_players[i], sorted_players[i+1]))
+            else:
+                pairs.append((sorted_players[i+1], sorted_players[i]))
+
+    # If odd number of players, last player gets a bye
+    if len(sorted_players) % 2 == 1:
+        pairs.append((sorted_players[-1], None))
+
+    return pairs
+
+def macmahon_pairing(players):
+    """
+    Implementation of MacMahon pairing system
+    """
+    # Group players by score/rating
+    player_groups = {}
+    for player in players:
+        score = player.current_score
+        if score not in player_groups:
+            player_groups[score] = []
+        player_groups[score].append(player)
+
+    pairs = []
+    unpaired = []
+
+    # Pair within same score groups first
+    for score in sorted(player_groups.keys(), reverse=True):
+        group = player_groups[score]
+        group_pairs = swiss_pairing(group)
+        pairs.extend([p for p in group_pairs if p[1] is not None])
+        if any(p[1] is None for p in group_pairs):
+            unpaired.extend([p[0] for p in group_pairs if p[1] is None])
+
+    # Pair remaining players across groups
+    if unpaired:
+        cross_pairs = swiss_pairing(unpaired)
+        pairs.extend(cross_pairs)
+
+    return pairs
