@@ -23,10 +23,14 @@ class PlayerForm(FlaskForm):
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     player_photo = FileField('Player Photo', validators=[
-        FileRequired(),
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     submit = SubmitField('Submit')
+
+    def __init__(self, *args, **kwargs):
+        super(PlayerForm, self).__init__(*args, **kwargs)
+        if kwargs.get('obj') is not None:  # If editing existing player
+            self.player_photo.validators = [FileAllowed(['jpg', 'png'], 'Images only!')]
 
 class TournamentForm(FlaskForm):
     name = StringField('Tournament Name', validators=[DataRequired()])
@@ -35,12 +39,19 @@ class TournamentForm(FlaskForm):
     state = SelectField('State', choices=[(state, state) for state in INDIAN_STATES], validators=[DataRequired()])
     info = TextAreaField('Tournament Information (Markdown supported)')
     cover_photo = FileField('Tournament Cover Photo', validators=[
-        FileRequired(),
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
-    rounds = IntegerField('Number of Rounds', validators=[DataRequired()])
+    pairing_system = SelectField('Pairing System', 
+                               choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
+                               default='swiss')
+    rounds = IntegerField('Number of Rounds', validators=[Optional()])
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
+
+    def __init__(self, *args, **kwargs):
+        super(TournamentForm, self).__init__(*args, **kwargs)
+        if kwargs.get('obj') is None:  # If creating new tournament
+            self.cover_photo.validators.append(FileRequired())
 
     def validate_end_date(self, field):
         if field.data <= self.start_date.data:

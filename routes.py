@@ -167,7 +167,8 @@ def add_tournament():
             state=form.state.data,
             info=form.info.data,
             rounds=form.rounds.data,
-            status='upcoming'  # Set initial status
+            status='upcoming',  # Set initial status
+            pairing_system=form.pairing_system.data #Added pairing_system
         )
 
         if form.cover_photo.data:
@@ -211,7 +212,7 @@ def edit_tournament(tournament_id):
     form = TournamentForm(obj=tournament)
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
-    # Set current players and format dates when displaying the form
+    # Set current players when displaying the form
     if not form.is_submitted():
         form.players.data = [tp.player_id for tp in tournament.players]
         # Format dates for datetime-local input
@@ -226,10 +227,17 @@ def edit_tournament(tournament_id):
         tournament.end_date = form.end_date.data
         tournament.state = form.state.data
         tournament.info = form.info.data
-        tournament.rounds = form.rounds.data
+        tournament.pairing_system = form.pairing_system.data
 
         if form.cover_photo.data:
+            old_photo = tournament.cover_photo
             tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
+            # Delete old photo if it exists
+            if old_photo:
+                try:
+                    os.remove(os.path.join(current_app.root_path, 'static', old_photo))
+                except OSError:
+                    pass  # Ignore file deletion errors
 
         # Update players
         TournamentPlayer.query.filter_by(tournament_id=tournament.id).delete()
