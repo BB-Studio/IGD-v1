@@ -150,25 +150,14 @@ def add_tournament():
     form.players.choices = [(p.id, f"{p.name} (ID: {p.player_id})") for p in Player.query.order_by(Player.rating.desc()).all()]
 
     if form.validate_on_submit():
-        # Debug logging
-        print("Debug - Start Date:", form.start_date.data)
-        print("Debug - End Date:", form.end_date.data)
-        print("Debug - Form Data:", form.data)
-
-        # Create upload directories if they don't exist
-        uploads_path = os.path.join(current_app.root_path, 'static', 'uploads')
-        tournaments_path = os.path.join(uploads_path, 'tournaments')
-        os.makedirs(tournaments_path, exist_ok=True)
-
         tournament = Tournament(
             name=form.name.data,
             start_date=form.start_date.data,
             end_date=form.end_date.data,
             state=form.state.data,
             info=form.info.data,
-            rounds=form.rounds.data,
             status='upcoming',  # Set initial status
-            pairing_system=form.pairing_system.data #Added pairing_system
+            pairing_system=form.pairing_system.data
         )
 
         if form.cover_photo.data:
@@ -190,10 +179,6 @@ def add_tournament():
         db.session.commit()
         flash('Tournament created successfully!')
         return redirect(url_for('main.tournaments'))
-
-    # Debug logging for GET request
-    if request.method == 'GET':
-        print("Debug - Form Errors:", form.errors)
 
     return render_template('add_tournament.html', form=form)
 
@@ -553,41 +538,52 @@ def create_round(tournament_id):
     # Update tournament status to ongoing if it's not already
     if tournament.status == 'upcoming':
         tournament.status = 'ongoing'
+        db.session.commit()
 
-    # Create new round
-    round_number = len(tournament.rounds) + 1
-    new_round = Round(
-        tournament=tournament,
-        number=round_number,
-        datetime=datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M'),
-        status='pending'
-    )
-    db.session.add(new_round)
+    try:
+        # Create new round
+        round_number = len(tournament.rounds) + 1
+        round_datetime = datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M')
 
-    # Get players and their current ratings
-    tournament_players = [tp.player for tp in tournament.players]
+        new_round = Round(
+            tournament=tournament,
+            number=round_number,
+            datetime=round_datetime,
+            status='pending'
+        )
+        db.session.add(new_round)
+        db.session.commit()
 
-    # Generate pairings based on tournament system
-    if tournament.pairing_system == 'macmahon':
-        pairs = macmahon_pairing(tournament_players)
-    else:  # default to Swiss
-        pairs = swiss_pairing(tournament_players)
+        # Get players and their current ratings
+        tournament_players = [tp.player for tp in tournament.players]
 
-    # Create pairings
-    for white, black in pairs:
-        if black is not None:  # Skip byes
-            pairing = RoundPairing(
-                round=new_round,
-                white_player=white,
-                black_player=black
-            )
-            db.session.add(pairing)
+        # Generate pairings based on tournament system
+        if tournament.pairing_system == 'macmahon':
+            pairs = macmahon_pairing(tournament_players)
+        else:  # default to Swiss
+            pairs = swiss_pairing(tournament_players)
 
-    db.session.commit()
-    flash(f'Round {round_number} created successfully!')
+        # Create pairings
+        for white, black in pairs:
+            if black is not None:  # Skip byes
+                pairing = RoundPairing(
+                    round=new_round,
+                    white_player=white,
+                    black_player=black
+                )
+                db.session.add(pairing)
+
+        db.session.commit()
+        flash(f'Round {round_number} created successfully!')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating round: {str(e)}', 'error')
+        print(f"Error creating round: {str(e)}")  # Debug log
+
     return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
-@main_bp.route('/tournament/round/<int:round_id>/repair', methods=['POST'])
+@main_bp.route('/tournament/<int:round_id>/repair', methods=['POST'])
 @login_required
 def repair_round(round_id):
     if not current_user.is_admin:

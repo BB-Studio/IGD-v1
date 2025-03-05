@@ -30,7 +30,9 @@ class PlayerForm(FlaskForm):
     def __init__(self, *args, **kwargs):
         super(PlayerForm, self).__init__(*args, **kwargs)
         if kwargs.get('obj') is not None:  # If editing existing player
+            # Make photos optional when editing
             self.player_photo.validators = [FileAllowed(['jpg', 'png'], 'Images only!')]
+            self.id_card_photo.validators = [FileAllowed(['jpg', 'png'], 'Images only!')]
 
 class TournamentForm(FlaskForm):
     name = StringField('Tournament Name', validators=[DataRequired()])
@@ -42,9 +44,8 @@ class TournamentForm(FlaskForm):
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     pairing_system = SelectField('Pairing System', 
-                               choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
-                               default='swiss')
-    rounds = IntegerField('Number of Rounds', validators=[Optional()])
+                                choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
+                                default='swiss')
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
 
