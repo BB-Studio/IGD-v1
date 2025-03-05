@@ -74,32 +74,6 @@
                 </div>
             </div>
         </div>
-
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">System Status</h5>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <tbody>
-                                <tr>
-                                    <th>Database Size</th>
-                                    <td>{{ system_stats.db_size }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Last Backup</th>
-                                    <td>{{ system_stats.last_backup }}</td>
-                                </tr>
-                                <tr>
-                                    <th>System Version</th>
-                                    <td>{{ system_stats.version }}</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 {% endblock %}

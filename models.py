@@ -81,7 +81,6 @@ class Tournament(db.Model):
     state = db.Column(db.String(50), nullable=False)
     info = db.Column(db.Text)  # Markdown content
     cover_photo = db.Column(db.String(255))  # Path to cover photo
-    rounds = db.Column(db.Integer, nullable=False)
     status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed
     players = db.relationship('TournamentPlayer', backref='tournament', lazy=True)
     matches = db.relationship('Match', backref='tournament', lazy=True)

@@ -322,28 +322,9 @@ def tournament_details(tournament_id):
     tournament = Tournament.query.get_or_404(tournament_id)
     markdown_html = markdown2.markdown(tournament.info) if tournament.info else ''
 
-    # Calculate rating changes for each player
-    rating_changes = []
-    for tp in tournament.players:
-        if tp.final_rating:
-            rating_change = tp.final_rating - tp.initial_rating
-            rating_changes.append({
-                'name': tp.player.name,
-                'ratingChange': rating_change
-            })
-
-    # Add system statistics
-    system_stats = {
-        'db_size': 'N/A',  # This would require additional setup to track
-        'last_backup': datetime.utcnow().strftime('%Y-%m-%d'),
-        'version': '1.0.0'
-    }
-
     return render_template('tournament_details.html', 
                          tournament=tournament, 
-                         tournament_info_html=markdown_html,
-                         rating_changes=rating_changes,
-                         system_stats=system_stats)
+                         tournament_info_html=markdown_html)
 
 @main_bp.route('/admin/dashboard')
 @login_required
