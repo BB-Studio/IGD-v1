@@ -34,6 +34,21 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
+    @property
+    def is_active(self):
+        return True
+
+    @property
+    def is_authenticated(self):
+        return True
+
+    @property
+    def is_anonymous(self):
+        return False
+
+    def get_id(self):
+        return str(self.id)
+
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.String(10), unique=True, default=generate_player_id)

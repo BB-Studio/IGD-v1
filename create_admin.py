@@ -11,7 +11,7 @@ def create_admin_user(username='admin', password='qwerty'):
                 email='admin@example.com',
                 is_admin=True
             )
-        user.password_hash = generate_password_hash(password)
+        user.set_password(password)  # Use set_password instead of directly setting password_hash
         db.session.add(user)
         db.session.commit()
         print(f"Admin user '{username}' created/updated successfully!")
