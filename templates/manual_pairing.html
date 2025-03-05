@@ -1,0 +1,179 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Manual Pairing - Round {{ round.number }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Manual Pairing - Round {{ round.number }}</h1>
+    <h2>{{ tournament.name }}</h2>
+    
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="post">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Pair #</th>
+                                <th>White Player</th>
+                                <th>Black Player</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pairings-container">
+                            {% for pairing in existing_pairings %}
+                            <tr>
+                                <td>{{ loop.index }}</td>
+                                <td>
+                                    <select name="white_player_{{ loop.index0 }}" class="form-select">
+                                        <option value="">-- Select Player --</option>
+                                        {% for player in players %}
+                                        <option value="{{ player.id }}" {% if pairing.white_player_id == player.id %}selected{% endif %}>
+                                            {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                                        </option>
+                                        {% endfor %}
+                                        <option value="bye" {% if not pairing.white_player %}selected{% endif %}>Bye</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="black_player_{{ loop.index0 }}" class="form-select">
+                                        <option value="">-- Select Player --</option>
+                                        {% for player in players %}
+                                        <option value="{{ player.id }}" {% if pairing.black_player_id == player.id %}selected{% endif %}>
+                                            {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                                        </option>
+                                        {% endfor %}
+                                        <option value="bye" {% if not pairing.black_player %}selected{% endif %}>Bye</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-danger btn-sm remove-pair">Remove</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            
+                            {% if not existing_pairings %}
+                            <tr>
+                                <td>1</td>
+                                <td>
+                                    <select name="white_player_0" class="form-select">
+                                        <option value="">-- Select Player --</option>
+                                        {% for player in players %}
+                                        <option value="{{ player.id }}">
+                                            {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                                        </option>
+                                        {% endfor %}
+                                        <option value="bye">Bye</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="black_player_0" class="form-select">
+                                        <option value="">-- Select Player --</option>
+                                        {% for player in players %}
+                                        <option value="{{ player.id }}">
+                                            {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                                        </option>
+                                        {% endfor %}
+                                        <option value="bye">Bye</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-danger btn-sm remove-pair">Remove</button>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="mb-3">
+                    <button type="button" id="add-pair" class="btn btn-secondary">Add Pair</button>
+                </div>
+                
+                <div class="mb-3">
+                    <h4>Unpaired Players</h4>
+                    <div class="row">
+                        {% for player in unpaired_players %}
+                        <div class="col-md-3 mb-2">
+                            {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('main.tournament_details', tournament_id=tournament.id) }}" class="btn btn-secondary">Cancel</a>
+                    <button type="submit" class="btn btn-primary">Save Pairings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let pairingCount = document.querySelectorAll('#pairings-container tr').length;
+    
+    // Add pair button
+    document.getElementById('add-pair').addEventListener('click', function() {
+        const container = document.getElementById('pairings-container');
+        const newRow = document.createElement('tr');
+        
+        newRow.innerHTML = `
+            <td>${pairingCount + 1}</td>
+            <td>
+                <select name="white_player_${pairingCount}" class="form-select">
+                    <option value="">-- Select Player --</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">
+                        {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                    </option>
+                    {% endfor %}
+                    <option value="bye">Bye</option>
+                </select>
+            </td>
+            <td>
+                <select name="black_player_${pairingCount}" class="form-select">
+                    <option value="">-- Select Player --</option>
+                    {% for player in players %}
+                    <option value="{{ player.id }}">
+                        {{ player.name }} ({{ "%.0f"|format(player.rating) }})
+                    </option>
+                    {% endfor %}
+                    <option value="bye">Bye</option>
+                </select>
+            </td>
+            <td>
+                <button type="button" class="btn btn-danger btn-sm remove-pair">Remove</button>
+            </td>
+        `;
+        
+        container.appendChild(newRow);
+        pairingCount++;
+        
+        // Add event listener to the new remove button
+        newRow.querySelector('.remove-pair').addEventListener('click', removePair);
+    });
+    
+    // Remove pair function
+    function removePair() {
+        const row = this.closest('tr');
+        row.remove();
+        
+        // Update pair numbers
+        const rows = document.querySelectorAll('#pairings-container tr');
+        rows.forEach((row, index) => {
+            row.cells[0].textContent = index + 1;
+        });
+        
+        pairingCount = rows.length;
+    }
+    
+    // Add event listeners to existing remove buttons
+    document.querySelectorAll('.remove-pair').forEach(button => {
+        button.addEventListener('click', removePair);
+    });
+});
+</script>
+{% endblock %}

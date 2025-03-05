@@ -479,11 +479,6 @@ def edit_player(player_id):
     player = Player.query.get_or_404(player_id)
     form = PlayerForm(obj=player)
 
-    # When showing the form initially (GET request)
-    if request.method == 'GET':
-        # No need to set form fields as they're already populated with obj=player
-        pass
-
     if form.validate_on_submit():
         try:
             player.first_name = form.first_name.data
@@ -495,7 +490,7 @@ def edit_player(player_id):
                 player.phone = form.phone.data
 
             # Only update photos if new ones are uploaded
-            if form.player_photo.data and hasattr(form.player_photo.data, 'filename') and form.player_photo.data.filename:
+            if form.player_photo.data and form.player_photo.data.filename:
                 old_photo = player.player_photo
                 player.player_photo = save_photo(form.player_photo.data, 'players')
                 # Delete old photo if it exists
@@ -505,7 +500,7 @@ def edit_player(player_id):
                     except OSError:
                         pass
 
-            if current_user.is_admin and form.id_card_photo.data and hasattr(form.id_card_photo.data, 'filename') and form.id_card_photo.data.filename:
+            if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
                 old_photo = player.id_card_photo
                 player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
                 # Delete old photo if it exists
@@ -574,6 +569,10 @@ def create_round(tournament_id):
 
         # Get players and their current ratings
         tournament_players = [tp.player for tp in tournament.players]
+        
+        # Set current tournament ID for each player (used by MacMahon pairing)
+        for player in tournament_players:
+            player.current_tournament_id = tournament.id
 
         # Check if we have enough players
         if len(tournament_players) < 2:
@@ -582,11 +581,21 @@ def create_round(tournament_id):
             db.session.commit()
             return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
+        # Get all existing pairings to avoid duplicate matches
+        played_matches = set()
+        for r in tournament.rounds:
+            if r.id != new_round.id:  # Don't include the current round
+                for pairing in r.pairings:
+                    played_matches.add((pairing.white_player_id, pairing.black_player_id))
+                    played_matches.add((pairing.black_player_id, pairing.white_player_id))
+
         # Generate pairings based on tournament system
         if tournament.pairing_system == 'macmahon':
-            pairs = macmahon_pairing(tournament_players)
+            pairs = macmahon_pairing(tournament_players, played_matches)
+        elif tournament.pairing_system == 'round_robin':
+            pairs = round_robin_pairing(tournament_players, round_number, played_matches)
         else:  # default to Swiss
-            pairs = swiss_pairing(tournament_players)
+            pairs = swiss_pairing(tournament_players, played_matches)
 
         # Create pairings
         for white, black in pairs:
@@ -597,6 +606,23 @@ def create_round(tournament_id):
                     black_player=black
                 )
                 db.session.add(pairing)
+            else:
+                # Create a "bye" entry
+                pairing = RoundPairing(
+                    round=new_round,
+                    white_player=white,
+                    black_player=None,
+                    result="Bye"
+                )
+                db.session.add(pairing)
+                
+                # Update player score for the bye
+                tp = TournamentPlayer.query.filter_by(
+                    tournament_id=tournament.id, 
+                    player_id=white.id
+                ).first()
+                if tp:
+                    tp.current_score += 1  # Add a win for the bye
 
         db.session.commit()
         flash(f'Round {round_number} created successfully!')
@@ -621,12 +647,26 @@ def repair_round(round_id):
 
     # Get players and their current ratings
     tournament_players = [tp.player for tp in round.tournament.players]
+    
+    # Set current tournament ID for each player (used by MacMahon pairing)
+    for player in tournament_players:
+        player.current_tournament_id = round.tournament.id
+
+    # Get all existing pairings to avoid duplicate matches (from other rounds)
+    played_matches = set()
+    for r in round.tournament.rounds:
+        if r.id != round.id:  # Don't include the current round
+            for pairing in r.pairings:
+                played_matches.add((pairing.white_player_id, pairing.black_player_id))
+                played_matches.add((pairing.black_player_id, pairing.white_player_id))
 
     # Generate new pairings
     if round.tournament.pairing_system == 'macmahon':
-        pairs = macmahon_pairing(tournament_players)
+        pairs = macmahon_pairing(tournament_players, played_matches)
+    elif round.tournament.pairing_system == 'round_robin':
+        pairs = round_robin_pairing(tournament_players, round.number, played_matches)
     else:
-        pairs = swiss_pairing(tournament_players)
+        pairs = swiss_pairing(tournament_players, played_matches)
 
     # Create new pairings
     for white, black in pairs:
@@ -637,20 +677,106 @@ def repair_round(round_id):
                 black_player=black
             )
             db.session.add(pairing)
+        else:
+            # Create a "bye" entry
+            pairing = RoundPairing(
+                round=round,
+                white_player=white,
+                black_player=None,
+                result="Bye"
+            )
+            db.session.add(pairing)
 
     db.session.commit()
     return jsonify({'success': True})
+
+@main_bp.route('/tournament/<int:round_id>/manual_pairing', methods=['GET', 'POST'])
+@login_required
+def manual_pairing(round_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+        
+    round = Round.query.get_or_404(round_id)
+    tournament = round.tournament
+    
+    if request.method == 'POST':
+        # Clear existing pairings
+        RoundPairing.query.filter_by(round_id=round_id).delete()
+        
+        # Process form data to create new pairings
+        player_pairs = []
+        i = 0
+        while f'white_player_{i}' in request.form:
+            white_id = request.form.get(f'white_player_{i}')
+            black_id = request.form.get(f'black_player_{i}')
+            
+            if white_id:
+                if black_id and black_id != 'bye':
+                    # Regular pairing
+                    white_player = Player.query.get(white_id)
+                    black_player = Player.query.get(black_id)
+                    
+                    pairing = RoundPairing(
+                        round=round,
+                        white_player=white_player,
+                        black_player=black_player
+                    )
+                    db.session.add(pairing)
+                elif white_id != 'bye':
+                    # Bye
+                    white_player = Player.query.get(white_id)
+                    pairing = RoundPairing(
+                        round=round,
+                        white_player=white_player,
+                        black_player=None,
+                        result="Bye"
+                    )
+                    db.session.add(pairing)
+            
+            i += 1
+            
+        db.session.commit()
+        flash('Manual pairings created successfully!')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament.id))
+    
+    # Get all players for this tournament
+    players = [tp.player for tp in tournament.players]
+    
+    # Get existing pairings if any
+    existing_pairings = RoundPairing.query.filter_by(round_id=round_id).all()
+    
+    # Mark players who are already paired
+    paired_players = set()
+    for pairing in existing_pairings:
+        paired_players.add(pairing.white_player_id)
+        if pairing.black_player_id:
+            paired_players.add(pairing.black_player_id)
+    
+    # Get unpaired players
+    unpaired_players = [p for p in players if p.id not in paired_players]
+    
+    return render_template('manual_pairing.html', 
+                         round=round,
+                         tournament=tournament,
+                         players=players,
+                         unpaired_players=unpaired_players,
+                         existing_pairings=existing_pairings)
 
 @main_bp.route('/tournament/pairing/<int:pairing_id>/result', methods=['POST'])
 @login_required
 def update_pairing_result(pairing_id):
     if not current_user.is_admin:
-        return jsonify({'success': False, 'error': 'Access denied'})
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
 
     pairing = RoundPairing.query.get_or_404(pairing_id)
-    pairing.result = request.form['result']
-    db.session.commit()
-
+    
+    if pairing.result != "Bye":  # Don't change bye results
+        pairing.result = request.form['result']
+        db.session.commit()
+        flash('Result updated successfully!')
+    
     return redirect(url_for('main.tournament_details', tournament_id=pairing.round.tournament_id))
 
 @main_bp.route('/tournament/round/<int:round_id>/complete', methods=['POST'])
@@ -660,12 +786,25 @@ def complete_round(round_id):
         return jsonify({'success': False, 'error': 'Access denied'})
 
     round = Round.query.get_or_404(round_id)
+    tournament = round.tournament
 
-    # Update player ratings based on results
+    # Check if all pairings have results
+    incomplete_pairings = [p for p in round.pairings if not p.result]
+    if incomplete_pairings and 'force' not in request.args:
+        return jsonify({
+            'success': False, 
+            'error': 'Not all pairings have results. Please enter all results before completing the round.'
+        })
+
+    # Update player ratings and scores based on results
     glicko2 = Glicko2()
 
     for pairing in round.pairings:
         if pairing.result:
+            # Skip byes
+            if pairing.result == "Bye" or not pairing.black_player:
+                continue
+                
             # Calculate score (1 for win, 0.5 for draw, 0 for loss)
             if pairing.result == 'Jigo':
                 white_score = black_score = 0.5
@@ -673,6 +812,23 @@ def complete_round(round_id):
                 white_score, black_score = 1.0, 0.0
             else:  # B+
                 white_score, black_score = 0.0, 1.0
+
+            # Update player tournament scores
+            white_tp = TournamentPlayer.query.filter_by(
+                tournament_id=tournament.id, 
+                player_id=pairing.white_player_id
+            ).first()
+            
+            black_tp = TournamentPlayer.query.filter_by(
+                tournament_id=tournament.id, 
+                player_id=pairing.black_player_id
+            ).first()
+            
+            if white_tp:
+                white_tp.current_score += white_score
+            
+            if black_tp:
+                black_tp.current_score += black_score
 
             # Update white player rating
             white_matches = [(pairing.black_player.rating, 
@@ -700,53 +856,110 @@ def complete_round(round_id):
             pairing.white_player.rating = new_white_rating
             pairing.white_player.rating_deviation = new_white_rd
             pairing.white_player.volatility = new_white_vol
+            pairing.white_player.last_active = datetime.utcnow()
 
             pairing.black_player.rating = new_black_rating
             pairing.black_player.rating_deviation = new_black_rd
             pairing.black_player.volatility = new_black_vol
+            pairing.black_player.last_active = datetime.utcnow()
+            
+            # Create match record
+            match = Match(
+                tournament_id=tournament.id,
+                round_number=round.number,
+                round_start_time=round.datetime,
+                black_player_id=pairing.black_player_id,
+                white_player_id=pairing.white_player_id,
+                result=pairing.result,
+                date=datetime.utcnow()
+            )
+            db.session.add(match)
 
     # Mark round as completed
     round.status = 'completed'
 
     # Check if this was the last round
-    tournament = round.tournament
-    if all(r.status == 'completed' for r in tournament.rounds):
+    if tournament.pairing_system == 'round_robin':
+        total_rounds = (len(tournament.players) - 1) if len(tournament.players) % 2 == 0 else len(tournament.players)
+        if len(tournament.rounds) >= total_rounds and all(r.status == 'completed' for r in tournament.rounds):
+            tournament.status = 'completed'
+    elif all(r.status == 'completed' for r in tournament.rounds):
         tournament.status = 'completed'
 
     db.session.commit()
     return jsonify({'success': True})
 
-def swiss_pairing(players):
+def swiss_pairing(players, played_matches=None):
     """
     Implementation of Swiss pairing system
     """
+    if played_matches is None:
+        played_matches = set()  # Set of tuples (player1_id, player2_id)
+    
     # Sort players by rating
     sorted_players = sorted(players, key=lambda x: x.rating, reverse=True)
     pairs = []
+    paired_players = set()
 
-    # Simple pairing: match players with closest ratings
-    for i in range(0, len(sorted_players), 2):
-        if i + 1 < len(sorted_players):
-            # Randomly assign colors
-            if random.random() > 0.5:
-                pairs.append((sorted_players[i], sorted_players[i+1]))
-            else:
-                pairs.append((sorted_players[i+1], sorted_players[i]))
+    # Try to pair players who haven't played against each other yet
+    for i, player1 in enumerate(sorted_players):
+        if player1.id in paired_players:
+            continue
+            
+        for player2 in sorted_players[i+1:]:
+            if player2.id in paired_players:
+                continue
+                
+            pair_key1 = (player1.id, player2.id)
+            pair_key2 = (player2.id, player1.id)
+            
+            # Check if these players have already played against each other
+            if pair_key1 not in played_matches and pair_key2 not in played_matches:
+                # Randomly assign colors
+                if random.random() > 0.5:
+                    pairs.append((player1, player2))
+                else:
+                    pairs.append((player2, player1))
+                    
+                paired_players.add(player1.id)
+                paired_players.add(player2.id)
+                break
+        
+        # If we couldn't find a pair, just pair with the next available player
+        if player1.id not in paired_players:
+            for player2 in sorted_players:
+                if player2.id != player1.id and player2.id not in paired_players:
+                    # Randomly assign colors
+                    if random.random() > 0.5:
+                        pairs.append((player1, player2))
+                    else:
+                        pairs.append((player2, player1))
+                        
+                    paired_players.add(player1.id)
+                    paired_players.add(player2.id)
+                    break
 
     # If odd number of players, last player gets a bye
-    if len(sorted_players) % 2 == 1:
-        pairs.append((sorted_players[-1], None))
+    unpaired = [p for p in sorted_players if p.id not in paired_players]
+    if unpaired:
+        pairs.append((unpaired[0], None))
 
     return pairs
 
-def macmahon_pairing(players):
+def macmahon_pairing(players, played_matches=None):
     """
     Implementation of MacMahon pairing system
     """
+    if played_matches is None:
+        played_matches = set()
+        
     # Group players by score/rating
     player_groups = {}
     for player in players:
-        score = player.current_score
+        # Get the player's TournamentPlayer record to get current_score
+        tp = next((tp for tp in player.tournaments if tp.tournament_id == player.current_tournament_id), None)
+        score = tp.current_score if tp else 0
+        
         if score not in player_groups:
             player_groups[score] = []
         player_groups[score].append(player)
@@ -757,14 +970,71 @@ def macmahon_pairing(players):
     # Pair within same score groups first
     for score in sorted(player_groups.keys(), reverse=True):
         group = player_groups[score]
-        group_pairs = swiss_pairing(group)
+        group_pairs = swiss_pairing(group, played_matches)
         pairs.extend([p for p in group_pairs if p[1] is not None])
         if any(p[1] is None for p in group_pairs):
             unpaired.extend([p[0] for p in group_pairs if p[1] is None])
 
     # Pair remaining players across groups
     if unpaired:
-        cross_pairs = swiss_pairing(unpaired)
+        cross_pairs = swiss_pairing(unpaired, played_matches)
         pairs.extend(cross_pairs)
 
+    return pairs
+
+def round_robin_pairing(players, round_number, played_matches=None):
+    """
+    Implementation of Round Robin pairing system
+    Based on a circle method: https://en.wikipedia.org/wiki/Round-robin_tournament#Scheduling_algorithm
+    """
+    if played_matches is None:
+        played_matches = set()
+        
+    n = len(players)
+    pairs = []
+    
+    # If odd number of players, add a "dummy" player for byes
+    if n % 2 == 1:
+        n += 1
+        
+    # Create a list of player indices
+    indices = list(range(n))
+    
+    # For round i, player j plays against player (n-1-j+i) mod (n-1)
+    # Player n-1 stays fixed
+    fixed = indices[-1]
+    rotating = indices[:-1]
+    
+    # Rotate (round_number - 1) times
+    for _ in range((round_number - 1) % (n - 1)):
+        rotating = [rotating[-1]] + rotating[:-1]
+    
+    # Create pairings
+    for i in range(n // 2):
+        if i == 0 and n % 2 == 1:  # Handle bye for the fixed player
+            if len(players) <= fixed:  # The fixed position is the dummy
+                pairs.append((players[rotating[0]], None))
+            else:
+                pairs.append((players[fixed], None))
+        else:
+            idx1 = rotating[i]
+            idx2 = rotating[n - 2 - i]
+            
+            # Skip pairs that include the dummy player
+            if len(players) <= idx1 or len(players) <= idx2:
+                continue
+                
+            # Check if these players have already played
+            pair_key1 = (players[idx1].id, players[idx2].id)
+            pair_key2 = (players[idx2].id, players[idx1].id)
+            
+            if pair_key1 in played_matches or pair_key2 in played_matches:
+                continue
+                
+            # Randomly assign colors or alternate based on round number
+            if round_number % 2 == 0:
+                pairs.append((players[idx1], players[idx2]))
+            else:
+                pairs.append((players[idx2], players[idx1]))
+    
     return pairs

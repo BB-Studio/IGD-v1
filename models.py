@@ -65,6 +65,7 @@ class Player(db.Model):
     volatility = db.Column(db.Float, default=0.06)
     last_active = db.Column(db.DateTime, default=datetime.utcnow)
     tournaments = db.relationship('TournamentPlayer', backref='player', lazy=True)
+    current_tournament_id = None  # Used for pairing functions - not stored in DB
 
     @property
     def name(self):
@@ -74,8 +75,13 @@ class Player(db.Model):
         
     @property
     def current_score(self):
-        # This is needed for the MacMahon pairing function
-        # In a real application, you'd calculate this based on tournament results
+        # Get the player's score in the current tournament
+        if hasattr(self, 'current_tournament_id') and self.current_tournament_id:
+            tp = TournamentPlayer.query.filter_by(
+                tournament_id=self.current_tournament_id,
+                player_id=self.id
+            ).first()
+            return tp.current_score if tp else 0
         return 0  # Default score for new players
 
 class Tournament(db.Model):
@@ -88,7 +94,7 @@ class Tournament(db.Model):
     info = db.Column(db.Text)  # Markdown content
     cover_photo = db.Column(db.String(255))  # Path to cover photo
     status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed
-    pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon
+    pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon, round_robin
     players = db.relationship('TournamentPlayer', backref='tournament', lazy=True)
     rounds = db.relationship('Round', backref='tournament', lazy=True)
 
@@ -107,10 +113,10 @@ class RoundPairing(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     round_id = db.Column(db.Integer, db.ForeignKey('round.id'), nullable=False)
     white_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    result = db.Column(db.String(10))  # B+R, W+1.5, etc.
+    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=True)  # Can be NULL for byes
+    result = db.Column(db.String(10))  # B+R, W+1.5, Bye, etc.
     white_player = db.relationship('Player', foreign_keys=[white_player_id])
-    black_player = db.relationship('Player', foreign_keys=[black_player_id])
+    black_player = db.relationship('Player', foreign_keys=[black_player_id], uselist=False)
 
 class TournamentPlayer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -118,7 +124,7 @@ class TournamentPlayer(db.Model):
     player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
     initial_rating = db.Column(db.Float)
     final_rating = db.Column(db.Float)
-    current_score = db.Column(db.Float, default=0)  # For tournament standings
+    current_score = db.Column(db.Float, default=0.0)  # For tournament standings
 
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
