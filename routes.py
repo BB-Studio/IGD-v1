@@ -13,12 +13,17 @@ from glicko import Glicko2
 main_bp = Blueprint('main', __name__)
 
 def save_photo(photo, folder):
-    if not photo:
+    if not photo or not photo.filename:
         return None
     filename = secure_filename(photo.filename)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     unique_filename = f"{timestamp}_{filename}"
-    photo.save(os.path.join(current_app.root_path, 'static', 'uploads', folder, unique_filename))
+    
+    # Create upload directory if it doesn't exist
+    upload_path = os.path.join(current_app.root_path, 'static', 'uploads', folder)
+    os.makedirs(upload_path, exist_ok=True)
+    
+    photo.save(os.path.join(upload_path, unique_filename))
     return f'uploads/{folder}/{unique_filename}'
 
 @main_bp.route('/')
@@ -50,10 +55,10 @@ def add_player():
             phone=form.phone.data if current_user.is_admin else None
         )
 
-        if form.player_photo.data:
+        if form.player_photo.data and form.player_photo.data.filename:
             player.player_photo = save_photo(form.player_photo.data, 'players')
 
-        if current_user.is_admin and form.id_card_photo.data:
+        if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
             player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
 
         db.session.add(player)
@@ -165,7 +170,7 @@ def add_tournament():
             pairing_system=form.pairing_system.data
         )
 
-        if form.cover_photo.data:
+        if form.cover_photo.data and form.cover_photo.data.filename:
             tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
 
         db.session.add(tournament)
@@ -215,7 +220,7 @@ def edit_tournament(tournament_id):
         tournament.pairing_system = form.pairing_system.data
 
         # Only update cover photo if a new one is uploaded
-        if form.cover_photo.data:
+        if form.cover_photo.data and form.cover_photo.data.filename:
             old_photo = tournament.cover_photo
             tournament.cover_photo = save_photo(form.cover_photo.data, 'tournaments')
             # Delete old photo if it exists
@@ -470,7 +475,7 @@ def edit_player(player_id):
             player.phone = form.phone.data
 
         # Only update photos if new ones are uploaded
-        if form.player_photo.data:
+        if form.player_photo.data and form.player_photo.data.filename:
             old_photo = player.player_photo
             player.player_photo = save_photo(form.player_photo.data, 'players')
             # Delete old photo if it exists
@@ -480,7 +485,7 @@ def edit_player(player_id):
                 except OSError:
                     pass
 
-        if current_user.is_admin and form.id_card_photo.data:
+        if current_user.is_admin and form.id_card_photo.data and form.id_card_photo.data.filename:
             old_photo = player.id_card_photo
             player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')
             # Delete old photo if it exists
@@ -522,7 +527,17 @@ def create_round(tournament_id):
 
         # Create new round
         round_number = len(tournament.rounds) + 1
-        round_datetime = datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M')
+        
+        # Make sure datetime is provided
+        if 'datetime' not in request.form or not request.form['datetime']:
+            flash('Round date and time are required', 'error')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+            
+        try:
+            round_datetime = datetime.strptime(request.form['datetime'], '%Y-%m-%dT%H:%M')
+        except ValueError:
+            flash('Invalid date format. Please use YYYY-MM-DDTHH:MM format.', 'error')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
         new_round = Round(
             tournament=tournament,
@@ -535,6 +550,13 @@ def create_round(tournament_id):
 
         # Get players and their current ratings
         tournament_players = [tp.player for tp in tournament.players]
+        
+        # Check if we have enough players
+        if len(tournament_players) < 2:
+            flash('At least 2 players are required to create pairings.', 'error')
+            db.session.delete(new_round)
+            db.session.commit()
+            return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
         # Generate pairings based on tournament system
         if tournament.pairing_system == 'macmahon':

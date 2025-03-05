@@ -71,6 +71,12 @@ class Player(db.Model):
         if self.middle_name:
             return f"{self.first_name} {self.middle_name} {self.last_name}"
         return f"{self.first_name} {self.last_name}"
+        
+    @property
+    def current_score(self):
+        # This is needed for the MacMahon pairing function
+        # In a real application, you'd calculate this based on tournament results
+        return 0  # Default score for new players
 
 class Tournament(db.Model):
     id = db.Column(db.Integer, primary_key=True)

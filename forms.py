@@ -38,6 +38,7 @@ class TournamentForm(FlaskForm):
     pairing_system = SelectField('Pairing System', 
                                 choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
                                 default='swiss')
+    rounds = StringField('Number of Rounds', default='3')
     players = SelectMultipleField('Select Players', coerce=int)
     submit = SubmitField('Submit')
 
