@@ -1047,3 +1047,162 @@ def round_robin_pairing(players):
         pairings.extend(round_pairings)
 
     return pairings
+
+@main_bp.route('/admin/export_all', methods=['GET'])
+@login_required
+def export_all_data():
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    try:
+        # Create a text buffer for CSV writing
+        text_output = StringIO()
+        writer = csv.writer(text_output)
+
+        # Export Players
+        writer.writerow(['### PLAYERS ###'])
+        writer.writerow(['player_id', 'first_name', 'middle_name', 'last_name', 'state', 
+                        'email', 'phone', 'rating', 'rating_deviation', 'volatility'])
+
+        players = Player.query.all()
+        for player in players:
+            writer.writerow([
+                player.player_id,
+                player.first_name,
+                player.middle_name,
+                player.last_name,
+                player.state,
+                player.email,
+                player.phone,
+                player.rating,
+                player.rating_deviation,
+                player.volatility
+            ])
+
+        # Add a blank line between sections
+        writer.writerow([])
+
+        # Export Tournaments
+        writer.writerow(['### TOURNAMENTS ###'])
+        writer.writerow(['tournament_id', 'name', 'start_date', 'end_date', 'state', 
+                        'info', 'status', 'pairing_system'])
+
+        tournaments = Tournament.query.all()
+        for tournament in tournaments:
+            writer.writerow([
+                tournament.tournament_id,
+                tournament.name,
+                tournament.start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                tournament.end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                tournament.state,
+                tournament.info,
+                tournament.status,
+                tournament.pairing_system
+            ])
+
+        # Convert to binary buffer
+        binary_output = BytesIO()
+        binary_output.write(text_output.getvalue().encode('utf-8-sig'))  # Use UTF-8 with BOM for Excel compatibility
+        binary_output.seek(0)
+
+        filename = f'go_tournament_data_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+
+        return send_file(
+            binary_output,
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=filename
+        )
+
+    except Exception as e:
+        flash(f'Error exporting data: {str(e)}', 'error')
+        logging.error(f"Export error: {str(e)}")
+        return redirect(url_for('main.admin_dashboard'))
+
+@main_bp.route('/admin/import_all', methods=['POST'])
+@login_required
+def import_all_data():
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    if 'file' not in request.files:
+        flash('No file uploaded.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No file selected.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    if not file.filename.endswith('.csv'):
+        flash('Only CSV files are allowed.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    try:
+        # Read the CSV file
+        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+        reader = csv.reader(stream)
+
+        current_section = None
+        headers = None
+
+        for row in reader:
+            if not row:  # Skip empty rows
+                continue
+
+            if row[0].startswith('###'):  # Section header
+                current_section = row[0].strip('#').strip().lower()
+                headers = next(reader)  # Read headers for this section
+                continue
+
+            if current_section == 'players':
+                # Create a dictionary from headers and row values
+                data = dict(zip(headers, row))
+
+                # Check if player already exists
+                player = Player.query.filter_by(player_id=data['player_id']).first()
+                if not player:
+                    player = Player(
+                        player_id=data['player_id'],
+                        first_name=data['first_name'],
+                        middle_name=data['middle_name'],
+                        last_name=data['last_name'],
+                        state=data['state'],
+                        email=data['email'],
+                        phone=data['phone'],
+                        rating=float(data['rating']),
+                        rating_deviation=float(data['rating_deviation']),
+                        volatility=float(data['volatility'])
+                    )
+                    db.session.add(player)
+
+            elif current_section == 'tournaments':
+                # Create a dictionary from headers and row values
+                data = dict(zip(headers, row))
+
+                # Check if tournament already exists
+                tournament = Tournament.query.filter_by(tournament_id=data['tournament_id']).first()
+                if not tournament:
+                    tournament = Tournament(
+                        tournament_id=data['tournament_id'],
+                        name=data['name'],
+                        start_date=datetime.strptime(data['start_date'], '%Y-%m-%d %H:%M:%S'),
+                        end_date=datetime.strptime(data['end_date'], '%Y-%m-%d %H:%M:%S'),
+                        state=data['state'],
+                        info=data['info'],
+                        status=data['status'],
+                        pairing_system=data['pairing_system']
+                    )
+                    db.session.add(tournament)
+
+        db.session.commit()
+        flash('Data imported successfully!')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error importing data: {str(e)}')
+        logging.error(f"Import error: {str(e)}")
+
+    return redirect(url_for('main.admin_dashboard'))
