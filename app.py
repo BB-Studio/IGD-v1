@@ -17,10 +17,9 @@ app = Flask(__name__)
 
 # Configuration
 app.secret_key = os.environ.get("SESSION_SECRET", "your-secret-key-here")  # Updated secret key handling
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "sqlite:///go_stats.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///go_stats.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
     "pool_pre_ping": True,
 }
 app.config['WTF_CSRF_ENABLED'] = True  # Enable CSRF protection
