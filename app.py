@@ -3,6 +3,7 @@ import logging
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
 
 # Configure logging
@@ -25,6 +26,7 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 app.config['WTF_CSRF_ENABLED'] = True  # Enable CSRF protection
 
 # Initialize extensions
+csrf = CSRFProtect(app)  # Initialize CSRF protection
 db.init_app(app)
 login_manager = LoginManager()
 login_manager.init_app(app)

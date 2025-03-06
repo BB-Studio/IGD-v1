@@ -9,6 +9,7 @@ from app import db
 from models import Player, Tournament, Match, TournamentPlayer, Round, RoundPairing
 from forms import PlayerForm, TournamentForm  
 from glicko import Glicko2
+import logging
 
 main_bp = Blueprint('main', __name__)
 
@@ -620,16 +621,20 @@ def manual_pairing(tournament_id):
 
     tournament = Tournament.query.get_or_404(tournament_id)
 
-    # Get the list of white and black players
-    white_players = request.form.getlist('white_players[]')
-    black_players = request.form.getlist('black_players[]')
-
-    # Validate that we have equal numbers of white and black players
-    if len(white_players) != len(black_players):
-        flash('Unequal number of white and black players.')
-        return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
-
     try:
+        # Get the list of white and black players
+        white_players = request.form.getlist('white_players[]')
+        black_players = request.form.getlist('black_players[]')
+
+        # Validate that we have equal numbers of white and black players
+        if len(white_players) != len(black_players):
+            flash('Unequal number of white and black players.')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+        if not white_players or not black_players:
+            flash('Please select at least one pair of players.')
+            return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
         # Create a new round
         round_number = len(tournament.rounds) + 1
         new_round = Round(
@@ -642,6 +647,9 @@ def manual_pairing(tournament_id):
 
         # Create pairings
         for white_id, black_id in zip(white_players, black_players):
+            if not white_id or not black_id:
+                continue
+
             white_player = Player.query.get(white_id)
             black_player = Player.query.get(black_id)
 
@@ -662,6 +670,7 @@ def manual_pairing(tournament_id):
     except Exception as e:
         db.session.rollback()
         flash(f'Error creating pairings: {str(e)}')
+        logging.error(f"Error in manual_pairing: {str(e)}")
 
     return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
@@ -784,7 +793,7 @@ def complete_round(round_id):
                 pairing.black_player.rating_deviation,
                 pairing.black_player.volatility,
                 black_matches
-            )
+                        )
 
             # Save new ratings
             pairing.white_player.rating = new_white_rating
