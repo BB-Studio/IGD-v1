@@ -34,32 +34,17 @@ class User(UserMixin, db.Model):
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
-    @property
-    def is_active(self):
-        return True
-
-    @property
-    def is_authenticated(self):
-        return True
-
-    @property
-    def is_anonymous(self):
-        return False
-
-    def get_id(self):
-        return str(self.id)
-
 class Player(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.String(10), unique=True, default=generate_player_id)
-    first_name = db.Column(db.String(50), nullable=False)
+    first_name = db.Column(db.String(50))  # Made nullable
     middle_name = db.Column(db.String(50))
-    last_name = db.Column(db.String(50), nullable=False)
-    state = db.Column(db.String(50), nullable=False)
+    last_name = db.Column(db.String(50))  # Made nullable
+    state = db.Column(db.String(50))  # Made nullable
     email = db.Column(db.String(120))
     phone = db.Column(db.String(20))
-    id_card_photo = db.Column(db.String(255))  # Path to ID card photo
-    player_photo = db.Column(db.String(255))  # Path to player photo
+    id_card_photo = db.Column(db.String(255))
+    player_photo = db.Column(db.String(255))
     rating = db.Column(db.Float, default=1500)
     rating_deviation = db.Column(db.Float, default=350)
     volatility = db.Column(db.Float, default=0.06)
@@ -69,65 +54,64 @@ class Player(db.Model):
     @property
     def name(self):
         if self.middle_name:
-            return f"{self.first_name} {self.middle_name} {self.last_name}"
-        return f"{self.first_name} {self.last_name}"
-        
+            return f"{self.first_name or ''} {self.middle_name} {self.last_name or ''}"
+        return f"{self.first_name or ''} {self.last_name or ''}"
+
     @property
     def current_score(self):
-        # This is needed for the MacMahon pairing function
-        # In a real application, you'd calculate this based on tournament results
         return 0  # Default score for new players
 
 class Tournament(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tournament_id = db.Column(db.String(5), unique=True, default=generate_tournament_id)
-    name = db.Column(db.String(100), nullable=False)
-    start_date = db.Column(db.DateTime, nullable=False)
-    end_date = db.Column(db.DateTime, nullable=False)
-    state = db.Column(db.String(50), nullable=False)
-    info = db.Column(db.Text)  # Markdown content
-    cover_photo = db.Column(db.String(255))  # Path to cover photo
-    status = db.Column(db.String(20), default='upcoming')  # upcoming, ongoing, completed
-    pairing_system = db.Column(db.String(20), default='swiss')  # swiss, macmahon
-    players = db.relationship('TournamentPlayer', backref='tournament', lazy=True)
-    rounds = db.relationship('Round', backref='tournament', lazy=True)
+    name = db.Column(db.String(100))  # Made nullable
+    start_date = db.Column(db.DateTime)  # Made nullable
+    end_date = db.Column(db.DateTime)  # Made nullable
+    state = db.Column(db.String(50))  # Made nullable
+    info = db.Column(db.Text)
+    cover_photo = db.Column(db.String(255))
+    status = db.Column(db.String(20), default='upcoming')
+    pairing_system = db.Column(db.String(20), default='swiss')
+    players = db.relationship('TournamentPlayer', backref='tournament', lazy=True, cascade='all, delete-orphan')
+    rounds = db.relationship('Round', backref='tournament', lazy=True, cascade='all, delete-orphan')
 
 class Round(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
-    number = db.Column(db.Integer, nullable=False)
-    datetime = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), default='pending')  # pending, ongoing, completed
-    pairings = db.relationship('RoundPairing', backref='round', lazy=True)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id', ondelete='CASCADE'), nullable=False)
+    number = db.Column(db.Integer)  # Made nullable
+    datetime = db.Column(db.DateTime)  # Made nullable
+    status = db.Column(db.String(20), default='pending')
+    pairings = db.relationship('RoundPairing', backref='round', lazy=True, cascade='all, delete-orphan')
 
-    class Meta:
-        unique_together = ('tournament_id', 'number')
+    __table_args__ = (
+        db.UniqueConstraint('tournament_id', 'number', name='unique_round_number'),
+    )
 
 class RoundPairing(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    round_id = db.Column(db.Integer, db.ForeignKey('round.id'), nullable=False)
-    white_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    result = db.Column(db.String(10))  # B+R, W+1.5, etc.
+    round_id = db.Column(db.Integer, db.ForeignKey('round.id', ondelete='CASCADE'), nullable=False)
+    white_player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
+    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
+    result = db.Column(db.String(10))
     white_player = db.relationship('Player', foreign_keys=[white_player_id])
     black_player = db.relationship('Player', foreign_keys=[black_player_id])
 
 class TournamentPlayer(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
-    player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id', ondelete='CASCADE'), nullable=False)
+    player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
     initial_rating = db.Column(db.Float)
     final_rating = db.Column(db.Float)
-    current_score = db.Column(db.Float, default=0)  # For tournament standings
+    current_score = db.Column(db.Float, default=0)
 
 class Match(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id'), nullable=False)
-    round_number = db.Column(db.Integer, nullable=False)
+    tournament_id = db.Column(db.Integer, db.ForeignKey('tournament.id', ondelete='CASCADE'), nullable=False)
+    round_number = db.Column(db.Integer)  # Made nullable
     round_start_time = db.Column(db.DateTime)
-    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    white_player_id = db.Column(db.Integer, db.ForeignKey('player.id'), nullable=False)
-    result = db.Column(db.String(10))  # B+R, W+1.5, etc.
+    black_player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
+    white_player_id = db.Column(db.Integer, db.ForeignKey('player.id', ondelete='CASCADE'), nullable=False)
+    result = db.Column(db.String(10))
     date = db.Column(db.DateTime, default=datetime.utcnow)
 
     black_player = db.relationship('Player', foreign_keys=[black_player_id])

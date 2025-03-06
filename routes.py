@@ -178,14 +178,15 @@ def add_tournament():
             db.session.commit()
 
             # Add selected players to the tournament
-            for player_id in form.players.data:
+            for player_id in (form.players.data or []):
                 player = Player.query.get(player_id)
-                tournament_player = TournamentPlayer(
-                    tournament=tournament,
-                    player=player,
-                    initial_rating=player.rating
-                )
-                db.session.add(tournament_player)
+                if player:  # Only add if player exists
+                    tournament_player = TournamentPlayer(
+                        tournament=tournament,
+                        player=player,
+                        initial_rating=player.rating
+                    )
+                    db.session.add(tournament_player)
 
             db.session.commit()
             flash('Tournament created successfully!')
@@ -241,7 +242,7 @@ def edit_tournament(tournament_id):
 
         # Update players
         current_players = set(tp.player_id for tp in tournament.players)
-        new_players = set(form.players.data)
+        new_players = set(form.players.data or [])
 
         # Remove players that are no longer selected
         for tp in tournament.players[:]:
@@ -252,12 +253,13 @@ def edit_tournament(tournament_id):
         for player_id in new_players:
             if player_id not in current_players:
                 player = Player.query.get(player_id)
-                tournament_player = TournamentPlayer(
-                    tournament=tournament,
-                    player=player,
-                    initial_rating=player.rating
-                )
-                db.session.add(tournament_player)
+                if player:  # Only add if player exists
+                    tournament_player = TournamentPlayer(
+                        tournament=tournament,
+                        player=player,
+                        initial_rating=player.rating
+                    )
+                    db.session.add(tournament_player)
 
         try:
             db.session.commit()
@@ -504,7 +506,6 @@ def edit_player(player_id):
                         os.remove(os.path.join(current_app.root_path, 'static', old_photo))
                     except OSError:
                         pass
-
             if current_user.is_admin and form.id_card_photo.data and hasattr(form.id_card_photo.data, 'filename') and form.id_card_photo.data.filename:
                 old_photo = player.id_card_photo
                 player.id_card_photo = save_photo(form.id_card_photo.data, 'id_cards')

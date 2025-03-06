@@ -40,4 +40,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(main_bp)
 
 with app.app_context():
+    # Import all models to ensure they're registered with SQLAlchemy
+    from models import User, Player, Tournament, Round, RoundPairing, TournamentPlayer, Match
+    # Create all tables
     db.create_all()
