@@ -1,7 +1,9 @@
+import csv
+from io import StringIO
 from datetime import datetime, timedelta
 import os
 import random
-from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app, jsonify, make_response, send_file
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 import markdown2
@@ -411,6 +413,140 @@ def admin_dashboard():
                          tournament_stats=tournament_stats,
                          system_stats=system_stats,
                          recent_activity=recent_activity)
+
+
+@main_bp.route('/admin/export/<data_type>', methods=['GET'])
+@login_required
+def export_data(data_type):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    try:
+        output = StringIO()
+        writer = csv.writer(output)
+
+        if data_type == 'players':
+            # Write header
+            writer.writerow(['player_id', 'first_name', 'middle_name', 'last_name', 'state', 
+                           'email', 'phone', 'rating', 'rating_deviation', 'volatility'])
+
+            # Write data
+            players = Player.query.all()
+            for player in players:
+                writer.writerow([
+                    player.player_id,
+                    player.first_name,
+                    player.middle_name,
+                    player.last_name,
+                    player.state,
+                    player.email,
+                    player.phone,
+                    player.rating,
+                    player.rating_deviation,
+                    player.volatility
+                ])
+
+        elif data_type == 'tournaments':
+            # Write header
+            writer.writerow(['tournament_id', 'name', 'start_date', 'end_date', 'state', 
+                           'info', 'status', 'pairing_system'])
+
+            # Write data
+            tournaments = Tournament.query.all()
+            for tournament in tournaments:
+                writer.writerow([
+                    tournament.tournament_id,
+                    tournament.name,
+                    tournament.start_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    tournament.end_date.strftime('%Y-%m-%d %H:%M:%S'),
+                    tournament.state,
+                    tournament.info,
+                    tournament.status,
+                    tournament.pairing_system
+                ])
+
+        output.seek(0)
+        return send_file(
+            StringIO(output.getvalue()),
+            mimetype='text/csv',
+            as_attachment=True,
+            download_name=f'{data_type}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+        )
+
+    except Exception as e:
+        flash(f'Error exporting {data_type}: {str(e)}', 'error')
+        return redirect(url_for('main.admin_dashboard'))
+
+@main_bp.route('/admin/import/<data_type>', methods=['POST'])
+@login_required
+def import_data(data_type):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.index'))
+
+    if 'file' not in request.files:
+        flash('No file uploaded.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    file = request.files['file']
+    if file.filename == '':
+        flash('No file selected.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    if not file.filename.endswith('.csv'):
+        flash('Only CSV files are allowed.')
+        return redirect(url_for('main.admin_dashboard'))
+
+    try:
+        # Read the CSV file
+        stream = StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_reader = csv.DictReader(stream)
+
+        if data_type == 'players':
+            for row in csv_reader:
+                # Check if player already exists
+                player = Player.query.filter_by(player_id=row['player_id']).first()
+                if not player:
+                    player = Player(
+                        player_id=row['player_id'],
+                        first_name=row['first_name'],
+                        middle_name=row['middle_name'],
+                        last_name=row['last_name'],
+                        state=row['state'],
+                        email=row['email'],
+                        phone=row['phone'],
+                        rating=float(row['rating']),
+                        rating_deviation=float(row['rating_deviation']),
+                        volatility=float(row['volatility'])
+                    )
+                    db.session.add(player)
+
+        elif data_type == 'tournaments':
+            for row in csv_reader:
+                # Check if tournament already exists
+                tournament = Tournament.query.filter_by(tournament_id=row['tournament_id']).first()
+                if not tournament:
+                    tournament = Tournament(
+                        tournament_id=row['tournament_id'],
+                        name=row['name'],
+                        start_date=datetime.strptime(row['start_date'], '%Y-%m-%d %H:%M:%S'),
+                        end_date=datetime.strptime(row['end_date'], '%Y-%m-%d %H:%M:%S'),
+                        state=row['state'],
+                        info=row['info'],
+                        status=row['status'],
+                        pairing_system=row['pairing_system']
+                    )
+                    db.session.add(tournament)
+
+        db.session.commit()
+        flash(f'{data_type.title()} imported successfully!')
+
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error importing {data_type}: {str(e)}', 'error')
+
+    return redirect(url_for('main.admin_dashboard'))
 
 @main_bp.route('/tournament/<int:tournament_id>/complete', methods=['POST'])
 @login_required
