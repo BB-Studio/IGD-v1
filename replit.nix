@@ -1,8 +1,5 @@
 {pkgs}: {
   deps = [
-    pkgs.rapidjson
-    pkgs.iana-etc
-    pkgs.cacert
     pkgs.zlib
     pkgs.tk
     pkgs.tcl

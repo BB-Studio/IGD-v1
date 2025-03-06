@@ -50,29 +50,6 @@
         <div class="col-md-6 mb-4">
             <div class="card">
                 <div class="card-body">
-                    <h5 class="card-title">Data Import/Export</h5>
-                    <div class="mb-3">
-                        <a href="{{ url_for('main.export_all_data') }}" class="btn btn-primary">
-                            Export All Data
-                        </a>
-                    </div>
-                    <form method="POST" action="{{ url_for('main.import_all_data') }}" enctype="multipart/form-data">
-                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                        <div class="input-group">
-                            <input type="file" class="form-control" name="file" accept=".csv">
-                            <button type="submit" class="btn btn-success">Import Data</button>
-                        </div>
-                        <small class="form-text text-muted">
-                            Upload a CSV file containing player and tournament data.
-                        </small>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-6 mb-4">
-            <div class="card">
-                <div class="card-body">
                     <h5 class="card-title">Recent Activity</h5>
                     <div class="table-responsive">
                         <table class="table">

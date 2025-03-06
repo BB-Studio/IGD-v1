@@ -44,7 +44,6 @@
                         {% if current_user.is_admin %}
                         <a href="{{ url_for('main.edit_player', player_id=player.id) }}" class="btn btn-warning btn-sm">Edit</a>
                         <form method="POST" action="{{ url_for('main.delete_player', player_id=player.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this player? This action cannot be undone.');">
-                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>
                         {% endif %}
