@@ -1,5 +1,5 @@
 import csv
-from io import StringIO
+from io import StringIO, BytesIO
 from datetime import datetime, timedelta
 import os
 import random
@@ -423,8 +423,9 @@ def export_data(data_type):
         return redirect(url_for('main.index'))
 
     try:
-        output = StringIO()
-        writer = csv.writer(output)
+        # Create a text buffer for CSV writing
+        text_output = StringIO()
+        writer = csv.writer(text_output)
 
         if data_type == 'players':
             # Write header
@@ -466,16 +467,23 @@ def export_data(data_type):
                     tournament.pairing_system
                 ])
 
-        output.seek(0)
+        # Convert to binary buffer
+        binary_output = BytesIO()
+        binary_output.write(text_output.getvalue().encode('utf-8-sig'))  # Use UTF-8 with BOM for Excel compatibility
+        binary_output.seek(0)
+
+        filename = f'{data_type}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+
         return send_file(
-            StringIO(output.getvalue()),
+            binary_output,
             mimetype='text/csv',
             as_attachment=True,
-            download_name=f'{data_type}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
+            download_name=filename
         )
 
     except Exception as e:
         flash(f'Error exporting {data_type}: {str(e)}', 'error')
+        logging.error(f"Export error for {data_type}: {str(e)}")
         return redirect(url_for('main.admin_dashboard'))
 
 @main_bp.route('/admin/import/<data_type>', methods=['POST'])
