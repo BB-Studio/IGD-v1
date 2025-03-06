@@ -47,7 +47,11 @@ class TournamentForm(FlaskForm):
         FileAllowed(['jpg', 'png'], 'Images only!')
     ])
     pairing_system = SelectField('Pairing System', 
-                                choices=[('swiss', 'Swiss System'), ('macmahon', 'MacMahon System')],
+                                choices=[
+                                    ('swiss', 'Swiss System'), 
+                                    ('macmahon', 'MacMahon System'),
+                                    ('round_robin', 'Round Robin')
+                                ],
                                 default='swiss',
                                 validators=[Optional()])
     players = SelectMultipleField('Select Players', coerce=int, validators=[Optional()])

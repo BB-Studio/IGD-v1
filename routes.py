@@ -584,7 +584,9 @@ def create_round(tournament_id):
             return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
         # Generate pairings based on tournament system
-        if tournament.pairing_system == 'macmahon':
+        if tournament.pairing_system == 'round_robin':
+            pairs = round_robin_pairing(tournament_players)
+        elif tournament.pairing_system == 'macmahon':
             pairs = macmahon_pairing(tournament_players)
         else:  # default to Swiss
             pairs = swiss_pairing(tournament_players)
@@ -649,8 +651,35 @@ def update_pairing_result(pairing_id):
         return jsonify({'success': False, 'error': 'Access denied'})
 
     pairing = RoundPairing.query.get_or_404(pairing_id)
-    pairing.result = request.form['result']
-    db.session.commit()
+    result = request.form.get('result')
+
+    # Validate result format
+    valid_results = ['B+R', 'W+R', 'B+T', 'W+T', 'Jigo']
+    if result not in valid_results:
+        flash('Invalid result format')
+        return redirect(url_for('main.tournament_details', tournament_id=pairing.round.tournament_id))
+
+    # Update pairing result
+    pairing.result = result
+
+    # Create a match record
+    match = Match(
+        tournament_id=pairing.round.tournament_id,
+        round_number=pairing.round.number,
+        round_start_time=pairing.round.datetime,
+        black_player_id=pairing.black_player_id,
+        white_player_id=pairing.white_player_id,
+        result=result,
+        date=datetime.utcnow()
+    )
+
+    try:
+        db.session.add(match)
+        db.session.commit()
+        flash('Match result updated successfully')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error updating match result: {str(e)}')
 
     return redirect(url_for('main.tournament_details', tournament_id=pairing.round.tournament_id))
 
@@ -701,10 +730,12 @@ def complete_round(round_id):
             pairing.white_player.rating = new_white_rating
             pairing.white_player.rating_deviation = new_white_rd
             pairing.white_player.volatility = new_white_vol
+            pairing.white_player.last_active = datetime.utcnow()
 
             pairing.black_player.rating = new_black_rating
             pairing.black_player.rating_deviation = new_black_rd
             pairing.black_player.volatility = new_black_vol
+            pairing.black_player.last_active = datetime.utcnow()
 
     # Mark round as completed
     round.status = 'completed'
@@ -713,6 +744,10 @@ def complete_round(round_id):
     tournament = round.tournament
     if all(r.status == 'completed' for r in tournament.rounds):
         tournament.status = 'completed'
+
+        # Update final ratings for all tournament players
+        for tp in tournament.players:
+            tp.final_rating = tp.player.rating
 
     db.session.commit()
     return jsonify({'success': True})
@@ -769,3 +804,33 @@ def macmahon_pairing(players):
         pairs.extend(cross_pairs)
 
     return pairs
+
+def round_robin_pairing(players):
+    """
+    Implementation of Round Robin pairing system.
+    Creates a schedule where each player plays against every other player once.
+    """
+    if len(players) % 2 != 0:
+        # Add a "bye" player for odd number of players
+        players = players + [None]
+
+    n = len(players)
+    pairings = []
+    for round in range(n - 1):
+        # Generate pairings for this round
+        round_pairings = []
+        for i in range(n // 2):
+            player1 = players[i]
+            player2 = players[n - 1 - i]
+            if player1 and player2:  # Only create pairing if neither player is the "bye"
+                # Alternate colors based on position
+                if i % 2 == 0:
+                    round_pairings.append((player1, player2))
+                else:
+                    round_pairings.append((player2, player1))
+
+        # Rotate players for next round (keep first player fixed)
+        players = [players[0]] + [players[-1]] + players[1:-1]
+        pairings.extend(round_pairings)
+
+    return pairings

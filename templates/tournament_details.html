@@ -212,11 +212,12 @@
                     <div class="mb-3">
                         <label class="form-label">Result</label>
                         <select class="form-select" name="result" required>
+                            <option value="">Select result...</option>
                             <option value="B+R">Black Wins by Resignation</option>
                             <option value="W+R">White Wins by Resignation</option>
                             <option value="B+T">Black Wins on Time</option>
                             <option value="W+T">White Wins on Time</option>
-                            <option value="Jigo">Draw</option>
+                            <option value="Jigo">Draw (Jigo)</option>
                         </select>
                     </div>
                 </div>
@@ -236,34 +237,45 @@
 function editResult(pairingId) {
     const form = document.getElementById('editResultForm');
     form.action = `/tournament/pairing/${pairingId}/result`;
-    $('#editResultModal').modal('show');
+    const modal = new bootstrap.Modal(document.getElementById('editResultModal'));
+    modal.show();
 }
 
 function repairRound(roundId) {
     if (confirm('Are you sure you want to repair this round? This will reset all pairings.')) {
-        fetch(`/tournament/round/${roundId}/repair`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Failed to repair round: ' + data.error);
-                }
-            });
+        fetch(`/tournament/round/${roundId}/repair`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to repair round: ' + data.error);
+            }
+        });
     }
 }
 
 function completeRound(roundId) {
     if (confirm('Are you sure you want to complete this round? This will update all player ratings.')) {
-        fetch(`/tournament/round/${roundId}/complete`, { method: 'POST' })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Failed to complete round: ' + data.error);
-                }
-            });
+        fetch(`/tournament/round/${roundId}/complete`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Failed to complete round: ' + data.error);
+            }
+        });
     }
 }
 </script>
