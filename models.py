@@ -116,3 +116,4 @@ class Match(db.Model):
 
     black_player = db.relationship('Player', foreign_keys=[black_player_id])
     white_player = db.relationship('Player', foreign_keys=[white_player_id])
+    tournament = db.relationship('Tournament', backref='matches')

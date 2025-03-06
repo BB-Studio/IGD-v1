@@ -16,7 +16,7 @@
 
     <div class="row">
         <div class="col-md-4">
-            <div class="card player-stats-card mb-4">
+            <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Player Information</h5>
                     <p class="card-text">
@@ -36,7 +36,7 @@
                 </div>
             </div>
 
-            <div class="card player-stats-card mb-4">
+            <div class="card mb-4">
                 <div class="card-body">
                     <h5 class="card-title">Current Rating</h5>
                     <h2 class="card-text">{{ "%.2f"|format(player.rating) }}</h2>
@@ -80,7 +80,13 @@
                                 {% for match in recent_matches %}
                                 <tr>
                                     <td>{{ match.date.strftime('%Y-%m-%d') }}</td>
-                                    <td>{{ match.tournament.name }}</td>
+                                    <td>
+                                        {% if match.tournament %}
+                                            {{ match.tournament.name }}
+                                        {% else %}
+                                            Unknown Tournament
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if match.black_player_id == player.id %}
                                             vs {{ match.white_player.name }} (W)
