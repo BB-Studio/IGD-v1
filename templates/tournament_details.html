@@ -88,6 +88,17 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Rounds</h5>
+                    {% if current_user.is_admin and tournament.status != 'completed' %}
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoundModal">
+                            Create Round
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#manualPairingModal">
+                            Manual Pairing
+                        </button>
+                    </div>
+                    {% endif %}
+
                     {% if tournament.rounds %}
                     <ul class="nav nav-tabs" id="roundTabs" role="tablist">
                         {% for round in tournament.rounds %}
@@ -160,18 +171,11 @@
                     {% else %}
                     <p class="text-center text-muted mt-3">No rounds have been created yet.</p>
                     {% endif %}
-
-                    {% if current_user.is_admin and tournament.status != 'completed' %}
-                    <div class="mt-3">
-                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createRoundModal">
-                            Create Round
-                        </button>
-                    </div>
-                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
+
 </div>
 
 {% if current_user.is_admin and tournament.status != 'completed' %}
@@ -184,6 +188,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('main.create_round', tournament_id=tournament.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Date and Time</label>
@@ -199,6 +204,49 @@
     </div>
 </div>
 
+<!-- Manual Pairing Modal -->
+<div class="modal fade" id="manualPairingModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Manual Pairing</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="manualPairingForm" method="POST" action="{{ url_for('main.manual_pairing', tournament_id=tournament.id) }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div id="pairingsContainer">
+                        <!-- Template for pairing rows -->
+                        <div class="row mb-3">
+                            <div class="col">
+                                <select class="form-select" name="white_players[]" required>
+                                    <option value="">Select White Player</option>
+                                    {% for tp in tournament.players %}
+                                    <option value="{{ tp.player.id }}">{{ tp.player.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col">
+                                <select class="form-select" name="black_players[]" required>
+                                    <option value="">Select Black Player</option>
+                                    {% for tp in tournament.players %}
+                                    <option value="{{ tp.player.id }}">{{ tp.player.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addPairingRow()">Add Another Pairing</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Pairings</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <!-- Edit Result Modal -->
 <div class="modal fade" id="editResultModal" tabindex="-1">
     <div class="modal-dialog">
@@ -208,6 +256,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form id="editResultForm" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Result</label>
@@ -243,10 +292,12 @@ function editResult(pairingId) {
 
 function repairRound(roundId) {
     if (confirm('Are you sure you want to repair this round? This will reset all pairings.')) {
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         fetch(`/tournament/round/${roundId}/repair`, { 
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
             }
         })
         .then(response => response.json())
@@ -262,10 +313,12 @@ function repairRound(roundId) {
 
 function completeRound(roundId) {
     if (confirm('Are you sure you want to complete this round? This will update all player ratings.')) {
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
         fetch(`/tournament/round/${roundId}/complete`, { 
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
             }
         })
         .then(response => response.json())
@@ -277,6 +330,17 @@ function completeRound(roundId) {
             }
         });
     }
+}
+
+function addPairingRow() {
+    const container = document.getElementById('pairingsContainer');
+    const template = container.children[0];
+    const newRow = template.cloneNode(true);
+
+    // Clear selections in the new row
+    newRow.querySelectorAll('select').forEach(select => select.value = '');
+
+    container.appendChild(newRow);
 }
 </script>
 {% endblock %}

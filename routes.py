@@ -611,7 +611,61 @@ def create_round(tournament_id):
 
     return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
 
-@main_bp.route('/tournament/<int:round_id>/repair', methods=['POST'])
+@main_bp.route('/tournament/<int:tournament_id>/manual_pairing', methods=['POST'])
+@login_required
+def manual_pairing(tournament_id):
+    if not current_user.is_admin:
+        flash('Access denied.')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+    tournament = Tournament.query.get_or_404(tournament_id)
+
+    # Get the list of white and black players
+    white_players = request.form.getlist('white_players[]')
+    black_players = request.form.getlist('black_players[]')
+
+    # Validate that we have equal numbers of white and black players
+    if len(white_players) != len(black_players):
+        flash('Unequal number of white and black players.')
+        return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+    try:
+        # Create a new round
+        round_number = len(tournament.rounds) + 1
+        new_round = Round(
+            tournament=tournament,
+            number=round_number,
+            datetime=datetime.utcnow(),
+            status='pending'
+        )
+        db.session.add(new_round)
+
+        # Create pairings
+        for white_id, black_id in zip(white_players, black_players):
+            white_player = Player.query.get(white_id)
+            black_player = Player.query.get(black_id)
+
+            if white_player and black_player:
+                pairing = RoundPairing(
+                    round=new_round,
+                    white_player=white_player,
+                    black_player=black_player
+                )
+                db.session.add(pairing)
+
+        # Update tournament status if needed
+        if tournament.status == 'upcoming':
+            tournament.status = 'ongoing'
+
+        db.session.commit()
+        flash('Manual pairings created successfully.')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'Error creating pairings: {str(e)}')
+
+    return redirect(url_for('main.tournament_details', tournament_id=tournament_id))
+
+@main_bp.route('/tournament/round/<int:round_id>/repair', methods=['POST'])
 @login_required
 def repair_round(round_id):
     if not current_user.is_admin:
@@ -619,30 +673,36 @@ def repair_round(round_id):
 
     round = Round.query.get_or_404(round_id)
 
-    # Clear existing pairings
-    RoundPairing.query.filter_by(round_id=round_id).delete()
+    try:
+        # Clear existing pairings
+        RoundPairing.query.filter_by(round_id=round_id).delete()
 
-    # Get players and their current ratings
-    tournament_players = [tp.player for tp in round.tournament.players]
+        # Get players and their current ratings
+        tournament_players = [tp.player for tp in round.tournament.players]
 
-    # Generate new pairings
-    if round.tournament.pairing_system == 'macmahon':
-        pairs = macmahon_pairing(tournament_players)
-    else:
-        pairs = swiss_pairing(tournament_players)
+        # Generate new pairings based on tournament system
+        if round.tournament.pairing_system == 'round_robin':
+            pairs = round_robin_pairing(tournament_players)
+        elif round.tournament.pairing_system == 'macmahon':
+            pairs = macmahon_pairing(tournament_players)
+        else:  # default to Swiss
+            pairs = swiss_pairing(tournament_players)
 
-    # Create new pairings
-    for white, black in pairs:
-        if black is not None:
-            pairing = RoundPairing(
-                round=round,
-                white_player=white,
-                black_player=black
-            )
-            db.session.add(pairing)
+        # Create new pairings
+        for white, black in pairs:
+            if black is not None:  # Skip byes
+                pairing = RoundPairing(
+                    round=round,
+                    white_player=white,
+                    black_player=black
+                )
+                db.session.add(pairing)
 
-    db.session.commit()
-    return jsonify({'success': True})
+        db.session.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/tournament/pairing/<int:pairing_id>/result', methods=['POST'])
 @login_required
